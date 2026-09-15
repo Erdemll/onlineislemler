@@ -4,7 +4,7 @@
         "Read more about it at https://getcomposer.org/doc/01-basic-usage.md#installing-dependencies",
         "This file is @generated automatically"
     ],
-    "content-hash": "7c5dc46e4534b15d9950044fe324c3a7",
+    "content-hash": "48ced7c2a88a58cbef1011e641d00332",
     "packages": [
         {
             "name": "brick/math",
@@ -2243,6 +2243,46 @@
                 }
             ],
             "time": "2026-09-12T20:45:19+00:00"
+        },
+        {
+            "name": "netgsm/otp",
+            "version": "v2.0.1",
+            "source": {
+                "type": "git",
+                "url": "https://github.com/netgsm/otp.git",
+                "reference": "0050171d9aaebb8077663c4b69c39e8b242bdfa3"
+            },
+            "dist": {
+                "type": "zip",
+                "url": "https://api.github.com/repos/netgsm/otp/zipball/0050171d9aaebb8077663c4b69c39e8b242bdfa3",
+                "reference": "0050171d9aaebb8077663c4b69c39e8b242bdfa3",
+                "shasum": ""
+            },
+            "require": {
+                "php": ">=7.2.5"
+            },
+            "type": "package",
+            "autoload": {
+                "psr-4": {
+                    "Netgsm\\Otp\\": "src/"
+                }
+            },
+            "notification-url": "https://packagist.org/downloads/",
+            "license": [
+                "MIT"
+            ],
+            "authors": [
+                {
+                    "name": "Netgsm OTP",
+                    "email": "teknikdestek@netgsm.com.tr"
+                }
+            ],
+            "description": "NETGSM OTP",
+            "support": {
+                "issues": "https://github.com/netgsm/otp/issues",
+                "source": "https://github.com/netgsm/otp/tree/v2.0.1"
+            },
+            "time": "2023-02-13T12:26:02+00:00"
         },
         {
             "name": "nette/schema",
