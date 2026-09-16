@@ -1,10 +1,22 @@
 <?php
 
-use App\Http\Controllers\Customer\RegisterController;
-use App\Http\Controllers\Customer\LoginController;
-use App\Http\Controllers\Customer\PhoneVerificationController;
+use App\Http\Controllers\Customer\EmailVerificationController;
 use App\Http\Controllers\Customer\ForgotPasswordController;
+use App\Http\Controllers\Customer\InvoiceController;
+use App\Http\Controllers\Customer\InvoiceIssueController;
+use App\Http\Controllers\Customer\InvoiceSyncController;
+use App\Http\Controllers\Customer\LoginController;
+use App\Http\Controllers\Customer\PhoneChangeController;
+use App\Http\Controllers\Customer\PhoneVerificationController;
+use App\Http\Controllers\Customer\ProfileController;
+use App\Http\Controllers\Customer\RegisterController;
+use App\Http\Controllers\Customer\ServiceController;
+use App\Http\Controllers\Customer\ServicePurchaseController;
 use Illuminate\Support\Facades\Route;
+
+Route::get('/', function () {
+    return redirect()->route('customer.dashboard');
+});
 
 Route::middleware('guest:customer')->group(function () {
 
@@ -21,14 +33,6 @@ Route::middleware('guest:customer')->group(function () {
     Route::post('/kayit', [RegisterController::class, 'store'])
         ->middleware('throttle:customer-register')
         ->name('customer.register.store');
-
-    Route::get(
-        '/kayit/telefon-dogrulama',
-        function () {
-            return view('customer.phone-verify');
-        }
-    )
-        ->name('customer.phone-verify');
 
     Route::get(
         '/sifremi-unuttum',
@@ -119,7 +123,7 @@ Route::middleware([
             'verify',
         ]
     )
-        ->middleware('throttle:customer-otp-verify')
+        ->middleware('throttle:customer-verification-verify')
         ->name('customer.phone.verify.store');
 
     Route::post(
@@ -129,7 +133,7 @@ Route::middleware([
             'resend',
         ]
     )
-        ->middleware('throttle:customer-otp-resend')
+        ->middleware('throttle:customer-verification-resend')
         ->name('customer.phone.resend');
 
     Route::post(
@@ -151,4 +155,133 @@ Route::middleware([
         '/online-islemler',
         'customer.dashboard'
     )->name('customer.dashboard');
+
+    Route::get(
+        '/online-islemler/faturalar',
+        [InvoiceController::class, 'index']
+    )->name('customer.invoices.index');
+
+    Route::post(
+        '/online-islemler/faturalar/esitle',
+        InvoiceSyncController::class
+    )
+        ->middleware('throttle:customer-invoice-sync')
+        ->name('customer.invoices.sync');
+
+    Route::post(
+        '/online-islemler/faturalar/{invoice:uuid}/tekrar-dene',
+        InvoiceIssueController::class
+    )
+        ->middleware('throttle:customer-purchase')
+        ->name('customer.invoices.retry');
+
+    Route::get(
+        '/online-islemler/hizmetler',
+        [ServiceController::class, 'index']
+    )->name('customer.services.index');
+
+    Route::post(
+        '/online-islemler/hizmetler/{service}/fatura-olustur',
+        ServicePurchaseController::class
+    )
+        ->middleware('throttle:customer-purchase')
+        ->name('customer.services.purchase');
+
+    Route::view(
+        '/online-islemler/destek',
+        'customer.support.index'
+    )->name('customer.support.index');
+
+    Route::view(
+        '/online-islemler/sozlesmeler',
+        'customer.contracts.index'
+    )->name('customer.contracts.index');
+
+    Route::get(
+        '/online-islemler/bilgilerim',
+        [ProfileController::class, 'show']
+    )->name('customer.profile');
+
+    Route::patch(
+        '/online-islemler/bilgilerim',
+        [ProfileController::class, 'update']
+    )->name('customer.profile.update');
+});
+
+Route::middleware([
+    'auth:customer',
+    'customer.session.current',
+    'customer.phone.verified',
+])->group(function () {
+
+    Route::post(
+        '/online-islemler/bilgilerim/telefon-degistir',
+        [PhoneChangeController::class, 'request']
+    )
+        ->middleware('throttle:customer-verification-resend')
+        ->name(
+            'customer.phone.change.request'
+        );
+
+    Route::get(
+        '/online-islemler/bilgilerim/telefon-dogrula',
+        [PhoneChangeController::class, 'showVerifyForm']
+    )->name(
+        'customer.phone.change.verify.form'
+    );
+
+    Route::post(
+        '/online-islemler/bilgilerim/telefon-dogrula',
+        [PhoneChangeController::class, 'verify']
+    )
+        ->middleware(
+            'throttle:customer-verification-verify'
+        )
+        ->name(
+            'customer.phone.change.verify'
+        );
+});
+
+Route::middleware([
+    'auth:customer',
+    'customer.session.current',
+])->group(function () {
+
+    Route::get(
+        '/e-posta-dogrula',
+        [
+            EmailVerificationController::class,
+            'show',
+        ]
+    )->name(
+        'customer.email.verify'
+    );
+
+    Route::post(
+        '/e-posta-dogrula',
+        [
+            EmailVerificationController::class,
+            'verify',
+        ]
+    )
+        ->middleware(
+            'throttle:customer-verification-verify'
+        )
+        ->name(
+            'customer.email.verify.store'
+        );
+
+    Route::post(
+        '/e-posta-dogrula/tekrar-gonder',
+        [
+            EmailVerificationController::class,
+            'resend',
+        ]
+    )
+        ->middleware(
+            'throttle:customer-verification-resend'
+        )
+        ->name(
+            'customer.email.resend'
+        );
 });

@@ -2,9 +2,9 @@
 
 namespace App\Http\Requests\Customer;
 
+use App\Support\PhoneNormalizer;
 use Illuminate\Foundation\Http\FormRequest;
 use Illuminate\Validation\Rules\Password;
-use App\Support\PhoneNormalizer;
 
 class RegisterCustomerRequest extends FormRequest
 {
@@ -19,9 +19,7 @@ class RegisterCustomerRequest extends FormRequest
             'first_name' => trim((string) $this->first_name),
             'last_name' => trim((string) $this->last_name),
 
-            'email' => $this->email
-                ? mb_strtolower(trim($this->email))
-                : null,
+            'email' => mb_strtolower(trim($this->email)),
 
             'phone' => PhoneNormalizer::normalize(
                 $this->phone
@@ -45,7 +43,7 @@ class RegisterCustomerRequest extends FormRequest
             ],
 
             'email' => [
-                'nullable',
+                'required',
                 'email',
                 'max:255',
                 'unique:customers,email',
@@ -71,6 +69,7 @@ class RegisterCustomerRequest extends FormRequest
             'first_name.required' => 'Ad alanı zorunludur.',
             'last_name.required' => 'Soyad alanı zorunludur.',
 
+            'email.required' => 'E-posta alanı zorunludur.',
             'email.email' => 'Geçerli bir e-posta adresi giriniz.',
             'email.unique' => 'Bu e-posta adresi zaten kullanılmaktadır.',
 

@@ -21,6 +21,8 @@ class CustomerFactory extends Factory
     {
         return [
             'uuid' => (string) Str::uuid(),
+            'cari_plus_current_account_id' => null,
+            'cari_plus_current_account_code' => null,
 
             'first_name' => fake()->firstName(),
             'last_name' => fake()->lastName(),
@@ -28,7 +30,7 @@ class CustomerFactory extends Factory
             'email' => fake()->unique()->safeEmail(),
 
             'phone' => '+905'
-                . fake()->unique()->numerify('#########'),
+                .fake()->unique()->numerify('#########'),
 
             'password' => Hash::make('TestPassword123!'),
 
@@ -44,16 +46,23 @@ class CustomerFactory extends Factory
         ];
     }
 
+    public function emailVerified(): static
+    {
+        return $this->state(fn () => [
+            'email_verified_at' => now(),
+        ]);
+    }
+
     public function phoneVerified(): static
     {
-        return $this->state(fn() => [
+        return $this->state(fn () => [
             'phone_verified_at' => now(),
         ]);
     }
 
     public function inactive(): static
     {
-        return $this->state(fn() => [
+        return $this->state(fn () => [
             'is_active' => false,
         ]);
     }

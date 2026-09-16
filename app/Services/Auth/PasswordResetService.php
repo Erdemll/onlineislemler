@@ -2,46 +2,24 @@
 
 namespace App\Services\Auth;
 
-use App\Contracts\SmsSender;
 use App\Models\Customer;
-use App\Models\OtpVerification;
-use Illuminate\Support\Facades\Hash;
+use App\Services\Verification\SmsVerificationCodeSender;
+use App\Services\Verification\VerificationCodeService;
 
 class PasswordResetService
 {
     public function __construct(
-        private SmsSender $sms
+        private VerificationCodeService $verificationCodes,
+        private SmsVerificationCodeSender $smsSender,
     ) {}
 
     public function sendOtp(Customer $customer): void
     {
-        OtpVerification::where(
-            'customer_id',
-            $customer->id
-        )
-            ->where(
-                'purpose',
-                'password_reset'
-            )
-            ->whereNull('verified_at')
-            ->delete();
-
-        $code = (string) random_int(
-            100000,
-            999999
-        );
-
-        OtpVerification::create([
-            'customer_id' => $customer->id,
-            'purpose' => 'password_reset',
-            'code_hash' => Hash::make($code),
-            'attempts' => 0,
-            'expires_at' => now()->addMinutes(5),
-        ]);
-
-        $this->sms->sendOtp(
-            $customer->phone,
-            $code
+        $this->verificationCodes->sendVia(
+            sender: $this->smsSender,
+            customer: $customer,
+            purpose: 'password_reset',
+            destination: $customer->phone,
         );
     }
 }

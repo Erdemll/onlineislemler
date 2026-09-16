@@ -21,11 +21,12 @@ class CustomerAccessTest extends TestCase
         );
     }
 
-
     public function test_unverified_customer_cannot_access_dashboard(): void
     {
         $customer = Customer::factory()
-            ->create();
+            ->create([
+                'phone_verified_at' => null,
+            ]);
 
         $response = $this
             ->actingAsCustomer($customer)
@@ -37,7 +38,6 @@ class CustomerAccessTest extends TestCase
             route('customer.phone.verify')
         );
     }
-
 
     public function test_verified_customer_can_access_dashboard(): void
     {

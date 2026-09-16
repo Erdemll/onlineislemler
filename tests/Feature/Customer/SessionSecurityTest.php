@@ -24,8 +24,7 @@ class SessionSecurityTest extends TestCase
                 'customer'
             )
             ->withSession([
-                'customer_session_version'
-                    => 3,
+                'customer_session_version' => 3,
             ])
             ->get(
                 route('customer.dashboard')
@@ -33,7 +32,6 @@ class SessionSecurityTest extends TestCase
 
         $response->assertOk();
     }
-
 
     public function test_old_session_version_forces_logout(): void
     {
@@ -49,8 +47,7 @@ class SessionSecurityTest extends TestCase
                 'customer'
             )
             ->withSession([
-                'customer_session_version'
-                    => 4,
+                'customer_session_version' => 4,
             ])
             ->get(
                 route('customer.dashboard')
@@ -64,7 +61,6 @@ class SessionSecurityTest extends TestCase
             route('customer.login')
         );
     }
-
 
     public function test_missing_session_version_forces_logout(): void
     {

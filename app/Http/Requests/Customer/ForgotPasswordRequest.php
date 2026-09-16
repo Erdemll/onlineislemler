@@ -19,9 +19,7 @@ class ForgotPasswordRequest extends FormRequest
     protected function prepareForValidation(): void
     {
         $this->merge([
-            'phone' => PhoneNormalizer::normalize(
-                $this->phone
-            ),
+            'phone' => PhoneNormalizer::normalize($this->phone),
         ]);
     }
 

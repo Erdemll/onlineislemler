@@ -36,7 +36,6 @@ class LoginTest extends TestCase
         );
     }
 
-
     public function test_customer_cannot_login_with_wrong_password(): void
     {
         Customer::factory()->create([
@@ -58,7 +57,6 @@ class LoginTest extends TestCase
         );
     }
 
-
     public function test_inactive_customer_cannot_login(): void
     {
         Customer::factory()
@@ -77,7 +75,6 @@ class LoginTest extends TestCase
 
         $this->assertGuest('customer');
     }
-
 
     public function test_unverified_customer_is_redirected_to_phone_verification(): void
     {

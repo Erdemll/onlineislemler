@@ -3,11 +3,10 @@
 namespace App\Http\Controllers\Customer;
 
 use App\Http\Controllers\Controller;
-use App\Models\OtpVerification;
 use App\Services\Auth\PhoneVerificationService;
+use App\Services\Verification\VerificationCodeService;
 use Illuminate\Http\RedirectResponse;
 use Illuminate\Http\Request;
-use Illuminate\Support\Facades\Hash;
 use Illuminate\View\View;
 
 class PhoneVerificationController extends Controller
@@ -21,13 +20,12 @@ class PhoneVerificationController extends Controller
                 ->route('customer.dashboard');
         }
 
-        return view(
-            'customer.auth.verify-phone'
-        );
+        return view('customer.phone-verify');
     }
 
     public function verify(
-        Request $request
+        Request $request,
+        VerificationCodeService $verificationService,
     ): RedirectResponse {
 
         $request->validate([
@@ -44,54 +42,15 @@ class PhoneVerificationController extends Controller
                 ->route('customer.dashboard');
         }
 
-        $verification = OtpVerification::where(
-            'customer_id',
-            $customer->id
-        )
-            ->where(
-                'purpose',
-                'phone_verification'
-            )
-            ->whereNull('verified_at')
-            ->latest()
-            ->first();
-
-        if (! $verification) {
-            return back()->withErrors([
-                'code' =>
-                'Aktif bir doğrulama kodu bulunamadı.',
-            ]);
-        }
-
-        if ($verification->expires_at->isPast()) {
-            return back()->withErrors([
-                'code' =>
-                'Doğrulama kodunun süresi dolmuş.',
-            ]);
-        }
-
-        if ($verification->attempts >= 5) {
-            return back()->withErrors([
-                'code' =>
-                'Çok fazla hatalı deneme yapıldı. Yeni kod isteyin.',
-            ]);
-        }
-
-        if (! Hash::check(
-            $request->code,
-            $verification->code_hash
+        if (! $verificationService->verify(
+            customer: $customer,
+            purpose: 'phone_verification',
+            code: $request->string('code')->toString(),
         )) {
-            $verification->increment('attempts');
-
             return back()->withErrors([
-                'code' =>
-                'Doğrulama kodu hatalı.',
+                'code' => 'Doğrulama kodu geçersiz veya süresi dolmuş.',
             ]);
         }
-
-        $verification->update([
-            'verified_at' => now(),
-        ]);
 
         $customer->forceFill([
             'phone_verified_at' => now(),

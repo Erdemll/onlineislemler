@@ -6,7 +6,8 @@ use App\Http\Controllers\Controller;
 use App\Http\Requests\Customer\ForgotPasswordRequest;
 use App\Models\Customer;
 use App\Models\OtpVerification;
-use App\Services\Auth\PasswordResetService;
+use App\Services\Verification\SmsVerificationCodeSender;
+use App\Services\Verification\VerificationCodeService;
 use Illuminate\Http\RedirectResponse;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Hash;
@@ -24,7 +25,8 @@ class ForgotPasswordController extends Controller
 
     public function sendOtp(
         ForgotPasswordRequest $request,
-        PasswordResetService $passwordResetService
+        VerificationCodeService $verificationService,
+        SmsVerificationCodeSender $smsSender
     ): RedirectResponse {
         $phone = $request->validated('phone');
 
@@ -36,7 +38,7 @@ class ForgotPasswordController extends Controller
             ->first();
 
         /*
-         * Telefonu session'a koyuyoruz.
+         * Telefon numarasını session'a koyuyoruz.
          * Kullanıcı sonraki OTP ekranında tekrar
          * customer_id gönderemeyecek.
          */
@@ -46,8 +48,11 @@ class ForgotPasswordController extends Controller
         );
 
         if ($customer) {
-            $passwordResetService->sendOtp(
-                $customer
+            $verificationService->sendVia(
+                sender: $smsSender,
+                customer: $customer,
+                purpose: 'password_reset',
+                destination: $customer->phone,
             );
         }
 
@@ -77,13 +82,12 @@ class ForgotPasswordController extends Controller
                 );
         }
 
-        return view(
-            'customer.auth.password-reset-otp'
-        );
+        return view('customer.password.otp.password-reset-otp');
     }
 
     public function verifyOtp(
-        Request $request
+        Request $request,
+        VerificationCodeService $verificationService
     ): RedirectResponse {
         $request->validate([
             'code' => [
@@ -120,46 +124,15 @@ class ForgotPasswordController extends Controller
             ]);
         }
 
-        $verification = OtpVerification::where(
-            'customer_id',
-            $customer->id
-        )
-            ->where(
-                'purpose',
-                'password_reset'
-            )
-            ->whereNull('verified_at')
-            ->latest()
-            ->first();
-
-        if (
-            ! $verification
-            || $verification->expires_at->isPast()
-            || $verification->attempts >= 5
-        ) {
+        if (! $verificationService->verify(
+            customer: $customer,
+            purpose: 'password_reset',
+            code: $request->string('code')->toString(),
+        )) {
             return back()->withErrors([
                 'code' => 'Doğrulama kodu geçersiz veya süresi dolmuş.',
             ]);
         }
-
-        if (
-            ! Hash::check(
-                $request->code,
-                $verification->code_hash
-            )
-        ) {
-            $verification->increment(
-                'attempts'
-            );
-
-            return back()->withErrors([
-                'code' => 'Doğrulama kodu geçersiz veya süresi dolmuş.',
-            ]);
-        }
-
-        $verification->forceFill([
-            'verified_at' => now(),
-        ])->save();
 
         /*
          * OTP doğrulaması kimlik seviyesini yükselttiği
@@ -168,15 +141,13 @@ class ForgotPasswordController extends Controller
         $request->session()->regenerate();
 
         $request->session()->put([
-            'password_reset_customer_id'
-                => $customer->id,
+            'password_reset_customer_id' => $customer->id,
 
-            'password_reset_authorized_at'
-                => now()->timestamp,
+            'password_reset_authorized_at' => now()->timestamp,
         ]);
 
         /*
-         * Telefon artık gerekli değil.
+         * Kurtarma telefon numarası artık gerekli değil.
          */
         $request->session()->forget(
             'password_reset_phone'
@@ -255,8 +226,7 @@ class ForgotPasswordController extends Controller
              * Birazdan açıklayacağımız
              * session version.
              */
-            'session_version'
-                => $customer->session_version + 1,
+            'session_version' => $customer->session_version + 1,
         ])->save();
 
         /*

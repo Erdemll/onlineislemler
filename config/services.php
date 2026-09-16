@@ -22,6 +22,21 @@ return [
         'key' => env('RESEND_API_KEY'),
     ],
 
+    'verimor_sms' => [
+        'username' => env('VERIMOR_SMS_USERNAME'),
+        'password' => env('VERIMOR_SMS_PASSWORD'),
+        'source_address' => env('VERIMOR_SMS_SOURCE_ADDRESS'),
+        'endpoint' => env('VERIMOR_SMS_ENDPOINT', 'https://sms.verimor.com.tr/v2/send.json'),
+    ],
+
+    'cari_plus' => [
+        'base_url' => env('CARI_PLUS_BASE_URL', 'https://api.cariplus.com.tr'),
+        'client_id' => env('CARI_PLUS_CLIENT_ID'),
+        'client_secret' => env('CARI_PLUS_CLIENT_SECRET'),
+        'connect_timeout' => (int) env('CARI_PLUS_CONNECT_TIMEOUT', 3),
+        'timeout' => (int) env('CARI_PLUS_TIMEOUT', 10),
+    ],
+
     'ses' => [
         'key' => env('AWS_ACCESS_KEY_ID'),
         'secret' => env('AWS_SECRET_ACCESS_KEY'),

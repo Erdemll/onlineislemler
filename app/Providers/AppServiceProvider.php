@@ -2,12 +2,16 @@
 
 namespace App\Providers;
 
+use App\Contracts\CariPlusGateway;
+use App\Contracts\SmsSender;
+use App\Contracts\VerificationCodeSender;
+use App\Services\CariPlus\CariPlusClient;
+use App\Services\Sms\VerimorSmsService;
+use App\Services\Verification\EmailVerificationCodeSender;
 use Illuminate\Cache\RateLimiting\Limit;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\RateLimiter;
 use Illuminate\Support\ServiceProvider;
-use App\Contracts\SmsSender;
-use App\Services\Sms\NetgsmSmsService;
 use Illuminate\Validation\Rules\Password;
 
 class AppServiceProvider extends ServiceProvider
@@ -15,8 +19,18 @@ class AppServiceProvider extends ServiceProvider
     public function register(): void
     {
         $this->app->bind(
+            VerificationCodeSender::class,
+            EmailVerificationCodeSender::class
+        );
+
+        $this->app->bind(
             SmsSender::class,
-            NetgsmSmsService::class
+            VerimorSmsService::class
+        );
+
+        $this->app->bind(
+            CariPlusGateway::class,
+            CariPlusClient::class
         );
     }
 
@@ -55,7 +69,7 @@ class AppServiceProvider extends ServiceProvider
 
             return [
                 Limit::perMinute(5)
-                    ->by($email . '|' . $request->ip()),
+                    ->by($email.'|'.$request->ip()),
 
                 Limit::perMinute(20)
                     ->by($request->ip()),
@@ -63,7 +77,7 @@ class AppServiceProvider extends ServiceProvider
         });
 
         RateLimiter::for(
-            'customer-otp-verify',
+            'customer-verification-verify',
             function (Request $request) {
 
                 $customer = $request->user('customer');
@@ -72,7 +86,7 @@ class AppServiceProvider extends ServiceProvider
                     Limit::perMinute(10)
                         ->by(
                             $customer?->id
-                                . '|' .
+                                .'|'.
                                 $request->ip()
                         ),
                 ];
@@ -80,7 +94,7 @@ class AppServiceProvider extends ServiceProvider
         );
 
         RateLimiter::for(
-            'customer-otp-resend',
+            'customer-verification-resend',
             function (Request $request) {
 
                 $customer = $request->user('customer');
@@ -119,5 +133,15 @@ class AppServiceProvider extends ServiceProvider
                 ];
             }
         );
+
+        RateLimiter::for('customer-purchase', function (Request $request) {
+            return Limit::perMinute(5)
+                ->by($request->user('customer')->id);
+        });
+
+        RateLimiter::for('customer-invoice-sync', function (Request $request) {
+            return Limit::perMinute(2)
+                ->by($request->user('customer')->id);
+        });
     }
 }
