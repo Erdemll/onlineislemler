@@ -4,7 +4,7 @@
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <meta name="color-scheme" content="light">
-    <title>@yield('title') · Online İşlemler</title>
+    <title>@yield('title') · Tepenet Güvenlik Online İşlemler</title>
     @vite(['resources/css/app.css', 'resources/js/app.js'])
 </head>
 <body class="min-h-screen bg-[#f3f1eb] text-slate-950 antialiased">
@@ -21,10 +21,13 @@
                 <a
                     href="{{ auth('customer')->check() && auth('customer')->user()->email_verified_at ? route('customer.dashboard') : route('customer.login') }}"
                     class="group flex items-center gap-3 focus-visible:outline-2 focus-visible:outline-offset-4 focus-visible:outline-[#1746d1]"
-                    aria-label="Online İşlemler ana sayfa"
+                    aria-label="Tepenet Güvenlik Online İşlemler ana sayfa"
                 >
-                    <span class="grid size-9 place-items-center bg-[#1746d1] text-xs font-bold tracking-[-0.04em] text-white">Oİ</span>
-                    <span class="text-sm font-semibold tracking-[-0.02em] sm:text-base">Online İşlemler</span>
+                    <img class="h-8 w-auto shrink-0 sm:h-10" src="{{ asset('logo.png') }}" alt="" aria-hidden="true">
+                    <span class="grid leading-tight">
+                        <span class="text-xs font-black tracking-[-0.02em] sm:text-sm">Tepenet Güvenlik</span>
+                        <span class="text-[0.65rem] font-bold uppercase tracking-[0.14em] text-slate-500 sm:text-xs">Online İşlemler</span>
+                    </span>
                 </a>
 
                 <nav class="flex items-center gap-2 text-sm sm:gap-4" aria-label="Hesap menüsü">
@@ -117,8 +120,8 @@
 
         <footer class="border-t border-slate-300 py-5">
             <div class="mx-auto flex w-full max-w-6xl flex-col gap-1 px-5 text-xs text-slate-600 sm:flex-row sm:items-center sm:justify-between sm:px-8">
-                <span>Güvenli müşteri işlemleri</span>
-                <span>© {{ now()->year }} Online İşlemler</span>
+                <span>Tepenet Güvenlik · Güvenli müşteri işlemleri</span>
+                <span>© {{ now()->year }} Tepenet Güvenlik</span>
             </div>
         </footer>
     </div>

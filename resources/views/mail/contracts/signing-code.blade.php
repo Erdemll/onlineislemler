@@ -1,4 +1,6 @@
 <x-mail::message>
+<img src="{{ asset('logo.png') }}" width="180" alt="Tepenet Güvenlik">
+
 # Sözleşme onay kodunuz
 
 **{{ $contractName }}** sözleşmesini **{{ $serviceName }}** hizmeti için onaylamak üzeresiniz.

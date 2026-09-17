@@ -4,7 +4,7 @@
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <meta name="color-scheme" content="light">
-    <title>@yield('title') · Yönetim Paneli</title>
+    <title>@yield('title') · Tepenet Güvenlik Yönetim</title>
     @vite(['resources/css/app.css', 'resources/js/app.js'])
 </head>
 <body class="min-h-screen bg-[#ecebe6] text-slate-950 antialiased">
@@ -14,9 +14,14 @@
         <div class="min-h-screen lg:grid lg:grid-cols-[16rem_1fr]">
             <aside class="border-b-2 border-slate-950 bg-slate-950 text-white lg:min-h-screen lg:border-b-0 lg:border-r-2">
                 <div class="flex min-h-18 items-center justify-between gap-4 border-b border-slate-700 px-5 py-3 lg:px-6">
-                    <a class="flex items-center gap-3" href="{{ route('admin.dashboard') }}">
-                        <span class="grid size-9 place-items-center bg-[#d7ff43] text-xs font-black text-slate-950">YP</span>
-                        <span class="font-black tracking-[-0.02em]">Yönetim Paneli</span>
+                    <a class="flex min-w-0 items-center gap-3" href="{{ route('admin.dashboard') }}" aria-label="Tepenet Güvenlik yönetim ana sayfa">
+                        <span class="grid shrink-0 place-items-center bg-white px-2 py-1">
+                            <img class="h-7 w-auto" src="{{ asset('logo.png') }}" alt="" aria-hidden="true">
+                        </span>
+                        <span class="grid min-w-0 leading-tight">
+                            <span class="truncate text-sm font-black tracking-[-0.02em]">Tepenet Güvenlik</span>
+                            <span class="text-[0.62rem] font-bold uppercase tracking-[0.14em] text-slate-400">Yönetim</span>
+                        </span>
                     </a>
                     <form class="lg:hidden" method="POST" action="{{ route('admin.logout') }}">
                         @csrf
@@ -29,6 +34,7 @@
                         ['route' => 'admin.dashboard', 'pattern' => 'admin.dashboard', 'label' => 'Genel bakış', 'no' => '01'],
                         ['route' => 'admin.contracts.index', 'pattern' => 'admin.contracts.*', 'label' => 'Sözleşmeler', 'no' => '02'],
                         ['route' => 'admin.contract-acceptances.index', 'pattern' => 'admin.contract-acceptances.*', 'label' => 'İmzalananlar', 'no' => '03'],
+                        ['route' => 'admin.support.index', 'pattern' => 'admin.support.*', 'label' => 'Destek', 'no' => '04'],
                     ] as $item)
                         <a
                             href="{{ route($item['route']) }}"

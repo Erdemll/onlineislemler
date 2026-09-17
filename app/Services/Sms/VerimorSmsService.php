@@ -32,7 +32,7 @@ class VerimorSmsService implements SmsSender
             'valid_for' => '00:05',
             'messages' => [
                 [
-                    'msg' => "Online İşlemler doğrulama kodunuz: {$code}. Kod 5 dakika geçerlidir.",
+                    'msg' => "Tepenet Güvenlik doğrulama kodunuz: {$code}. Kod 5 dakika geçerlidir.",
                     'dest' => $destination,
                 ],
             ],

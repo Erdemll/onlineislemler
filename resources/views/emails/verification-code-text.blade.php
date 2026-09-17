@@ -1,3 +1,5 @@
+Tepenet Güvenlik Online İşlemler
+
 Güvenlik Doğrulaması
 
 İşleminizi tamamlamak için doğrulama kodunuz: {{ $code }}
@@ -5,3 +7,5 @@ Güvenlik Doğrulaması
 Bu kod 5 dakika boyunca geçerlidir.
 
 Bu işlemi siz başlatmadıysanız bu e-postayı dikkate almayınız.
+
+Tepenet Güvenlik

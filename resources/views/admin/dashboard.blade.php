@@ -11,12 +11,13 @@
         <a class="inline-flex min-h-12 items-center justify-center bg-slate-950 px-5 text-sm font-black text-white hover:bg-[#1746d1]" href="{{ route('admin.contracts.create') }}">Yeni sözleşme sürümü</a>
     </header>
 
-    <section class="grid gap-4 sm:grid-cols-2 xl:grid-cols-4" aria-label="Yönetim özeti">
+    <section class="grid gap-4 sm:grid-cols-2 xl:grid-cols-5" aria-label="Yönetim özeti">
         @foreach ([
             ['label' => 'Sözleşme', 'value' => $contractCount],
             ['label' => 'Yayımlanan sürüm', 'value' => $versionCount],
             ['label' => 'İmzalanan belge', 'value' => $acceptanceCount],
             ['label' => 'Cari Plus ürünü', 'value' => $productCount],
+            ['label' => 'Yanıt bekleyen destek', 'value' => $supportTicketCount],
         ] as $item)
             <article class="border-2 border-slate-950 bg-white p-5">
                 <p class="text-xs font-black uppercase tracking-wider text-slate-500">{{ $item['label'] }}</p>

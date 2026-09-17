@@ -8,7 +8,7 @@
             <div class="grid gap-3">
                 <p class="text-xs font-bold uppercase tracking-[0.2em] text-[#1746d1]">Hesap özeti</p>
                 <h1 class="text-4xl font-semibold tracking-[-0.05em] sm:text-5xl">Merhaba, {{ auth('customer')->user()->first_name }}.</h1>
-                <p class="max-w-2xl text-sm leading-6 text-slate-600">Faturaların, hizmetlerin ve destek taleplerin bu ekranda toplanacak.</p>
+                <p class="max-w-2xl text-sm leading-6 text-slate-600">Tepenet Güvenlik faturaların, hizmetlerin ve destek taleplerin bu ekranda toplanır.</p>
             </div>
             <a class="inline-flex min-h-11 items-center justify-center border-2 border-slate-950 bg-white px-5 text-sm font-bold hover:bg-slate-950 hover:text-white focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-[#1746d1]" href="{{ route('customer.profile') }}">Bilgilerim</a>
         </section>

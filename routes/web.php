@@ -6,6 +6,9 @@ use App\Http\Controllers\Admin\ContractController as AdminContractController;
 use App\Http\Controllers\Admin\ContractDocumentController as AdminContractDocumentController;
 use App\Http\Controllers\Admin\DashboardController as AdminDashboardController;
 use App\Http\Controllers\Admin\ProductSyncController as AdminProductSyncController;
+use App\Http\Controllers\Admin\SupportReplyController as AdminSupportReplyController;
+use App\Http\Controllers\Admin\SupportTicketController as AdminSupportTicketController;
+use App\Http\Controllers\Admin\SupportTicketStatusController as AdminSupportTicketStatusController;
 use App\Http\Controllers\Customer\ContractAcceptanceController;
 use App\Http\Controllers\Customer\ContractDocumentController;
 use App\Http\Controllers\Customer\ContractSigningChallengeController;
@@ -24,6 +27,8 @@ use App\Http\Controllers\Customer\RegisterController;
 use App\Http\Controllers\Customer\ServiceController;
 use App\Http\Controllers\Customer\ServiceOrderContractController;
 use App\Http\Controllers\Customer\ServicePurchaseController;
+use App\Http\Controllers\Customer\SupportReplyController;
+use App\Http\Controllers\Customer\SupportTicketController;
 use Illuminate\Support\Facades\Route;
 
 Route::get('/', function () {
@@ -57,6 +62,15 @@ Route::prefix('admin')->name('admin.')->group(function () {
             ->name('contract-acceptances.show');
         Route::get('/imzalanan-sozlesmeler/{contractAcceptance:uuid}/indir', [AdminContractDocumentController::class, 'signed'])
             ->name('contract-acceptances.download');
+
+        Route::get('/destek', [AdminSupportTicketController::class, 'index'])->name('support.index');
+        Route::get('/destek/{supportTicket:uuid}', [AdminSupportTicketController::class, 'show'])->name('support.show');
+        Route::post('/destek/{supportTicket:uuid}/yanitlar', AdminSupportReplyController::class)
+            ->middleware('throttle:admin-support')
+            ->name('support.replies.store');
+        Route::patch('/destek/{supportTicket:uuid}/durum', AdminSupportTicketStatusController::class)
+            ->middleware('throttle:admin-support')
+            ->name('support.status.update');
     });
 });
 
@@ -143,6 +157,25 @@ Route::middleware('guest:customer')->group(function () {
     )->name(
         'customer.password.update'
     );
+});
+
+Route::middleware([
+    'auth:customer',
+    'customer.session.current',
+    'customer.email.verified',
+])->group(function () {
+    Route::get('/online-islemler/destek', [SupportTicketController::class, 'index'])
+        ->name('customer.support.index');
+    Route::get('/online-islemler/destek/yeni', [SupportTicketController::class, 'create'])
+        ->name('customer.support.create');
+    Route::post('/online-islemler/destek', [SupportTicketController::class, 'store'])
+        ->middleware('throttle:customer-support')
+        ->name('customer.support.store');
+    Route::get('/online-islemler/destek/{supportTicket}', [SupportTicketController::class, 'show'])
+        ->name('customer.support.show');
+    Route::post('/online-islemler/destek/{supportTicket}/yanitlar', SupportReplyController::class)
+        ->middleware('throttle:customer-support')
+        ->name('customer.support.replies.store');
 });
 
 Route::middleware([
@@ -236,11 +269,6 @@ Route::middleware([
     )
         ->middleware('throttle:customer-purchase')
         ->name('customer.services.purchase');
-
-    Route::view(
-        '/online-islemler/destek',
-        'customer.support.index'
-    )->name('customer.support.index');
 
     Route::get(
         '/online-islemler/sozlesmeler',

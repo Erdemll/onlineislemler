@@ -8,7 +8,7 @@
 <div class="grid gap-8">
     <header class="grid gap-6 border-b-2 border-slate-950 pb-8 sm:grid-cols-[1fr_auto] sm:items-end">
         <div class="grid gap-3">
-            <p class="text-xs font-bold uppercase tracking-[0.2em] text-[#1746d1]">Online İşlemler / {{ $number }}</p>
+            <p class="text-xs font-bold uppercase tracking-[0.2em] text-[#1746d1]">Tepenet Güvenlik / {{ $number }}</p>
             <h1 class="text-4xl font-semibold tracking-[-0.05em] sm:text-5xl">{{ $title }}</h1>
             <p class="max-w-2xl text-sm leading-6 text-slate-600">{{ $description }}</p>
         </div>

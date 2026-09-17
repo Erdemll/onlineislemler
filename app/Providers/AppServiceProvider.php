@@ -93,6 +93,10 @@ class AppServiceProvider extends ServiceProvider
             return Limit::perMinute(1)->by($request->user()?->id.'|admin-products');
         });
 
+        RateLimiter::for('admin-support', function (Request $request) {
+            return Limit::perMinute(20)->by($request->user()?->id.'|admin-support');
+        });
+
         RateLimiter::for(
             'customer-verification-verify',
             function (Request $request) {
@@ -168,6 +172,11 @@ class AppServiceProvider extends ServiceProvider
         RateLimiter::for('customer-product-sync', function () {
             return Limit::perMinute(1)
                 ->by('cari-plus-products');
+        });
+
+        RateLimiter::for('customer-support', function (Request $request) {
+            return Limit::perMinute(10)
+                ->by($request->user('customer')->id.'|'.$request->ip());
         });
 
         RateLimiter::for('customer-contract-code', function (Request $request) {

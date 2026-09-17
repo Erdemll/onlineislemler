@@ -131,4 +131,14 @@ class Customer extends Authenticatable
     {
         return $this->hasMany(ContractAcceptance::class);
     }
+
+    public function supportTickets(): HasMany
+    {
+        return $this->hasMany(SupportTicket::class);
+    }
+
+    public function supportMessages(): HasMany
+    {
+        return $this->hasMany(SupportMessage::class);
+    }
 }

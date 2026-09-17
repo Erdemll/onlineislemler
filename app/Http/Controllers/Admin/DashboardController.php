@@ -2,11 +2,13 @@
 
 namespace App\Http\Controllers\Admin;
 
+use App\Enums\SupportTicketStatus;
 use App\Http\Controllers\Controller;
 use App\Models\Contract;
 use App\Models\ContractAcceptance;
 use App\Models\ContractVersion;
 use App\Models\Service;
+use App\Models\SupportTicket;
 use Illuminate\View\View;
 
 class DashboardController extends Controller
@@ -18,6 +20,9 @@ class DashboardController extends Controller
             'versionCount' => ContractVersion::query()->count(),
             'acceptanceCount' => ContractAcceptance::query()->count(),
             'productCount' => Service::query()->whereNotNull('cari_plus_product_id')->count(),
+            'supportTicketCount' => SupportTicket::query()
+                ->where('status', SupportTicketStatus::AwaitingSupport)
+                ->count(),
             'recentAcceptances' => ContractAcceptance::query()
                 ->with(['customer:id,first_name,last_name,email', 'serviceOrder:id,service_name_snapshot'])
                 ->latest('accepted_at')
