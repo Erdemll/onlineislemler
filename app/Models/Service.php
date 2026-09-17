@@ -5,6 +5,7 @@ namespace App\Models;
 use Database\Factories\ServiceFactory;
 use Illuminate\Database\Eloquent\Factories\HasFactory;
 use Illuminate\Database\Eloquent\Model;
+use Illuminate\Database\Eloquent\Relations\BelongsToMany;
 use Illuminate\Database\Eloquent\Relations\HasMany;
 
 class Service extends Model
@@ -16,10 +17,14 @@ class Service extends Model
         'name',
         'description',
         'price',
+        'currency',
         'tax_rate',
+        'price_includes_tax',
         'cari_plus_service_id',
         'cari_plus_product_id',
         'cari_plus_sku',
+        'cari_plus_updated_at',
+        'synced_at',
         'is_active',
     ];
 
@@ -28,12 +33,36 @@ class Service extends Model
         return [
             'price' => 'decimal:2',
             'tax_rate' => 'decimal:2',
+            'price_includes_tax' => 'boolean',
+            'cari_plus_updated_at' => 'datetime',
+            'synced_at' => 'datetime',
             'is_active' => 'boolean',
         ];
+    }
+
+    public function grossPrice(): float
+    {
+        $price = (float) $this->price;
+
+        if ($this->price_includes_tax) {
+            return $price;
+        }
+
+        return round($price * (1 + ((float) $this->tax_rate / 100)), 2);
     }
 
     public function invoices(): HasMany
     {
         return $this->hasMany(Invoice::class);
+    }
+
+    public function contractVersions(): BelongsToMany
+    {
+        return $this->belongsToMany(ContractVersion::class, 'contract_service')->withPivot('is_required')->withTimestamps();
+    }
+
+    public function serviceOrders(): HasMany
+    {
+        return $this->hasMany(ServiceOrder::class);
     }
 }

@@ -2,11 +2,11 @@
 
 namespace App\Http\Controllers\Customer;
 
-use App\Exceptions\CariPlusException;
+use App\Exceptions\ContractSigningException;
 use App\Http\Controllers\Controller;
 use App\Http\Requests\Customer\PurchaseServiceRequest;
 use App\Models\Service;
-use App\Services\Billing\CreateServiceInvoice;
+use App\Services\Contracts\CreateServiceOrder;
 use Illuminate\Http\RedirectResponse;
 
 class ServicePurchaseController extends Controller
@@ -14,20 +14,22 @@ class ServicePurchaseController extends Controller
     public function __invoke(
         PurchaseServiceRequest $request,
         Service $service,
-        CreateServiceInvoice $createInvoice,
+        CreateServiceOrder $createOrder,
     ): RedirectResponse {
-        abort_unless($service->is_active, 404);
+        abort_unless(
+            $service->is_active && $service->cari_plus_product_id !== null,
+            404,
+        );
 
         try {
-            $createInvoice->create($request->user('customer'), $service);
-        } catch (CariPlusException $exception) {
+            $order = $createOrder->create($request->user('customer'), $service);
+        } catch (ContractSigningException $exception) {
             return redirect()
-                ->route('customer.invoices.index')
+                ->route('customer.services.index')
                 ->with('error', $exception->getMessage());
         }
 
         return redirect()
-            ->route('customer.invoices.index')
-            ->with('status', 'Faturanız oluşturuldu. Ödeme adımı yakında burada açılacak.');
+            ->route('customer.service-orders.contract.show', $order);
     }
 }

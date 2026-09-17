@@ -3,8 +3,10 @@
 namespace App\Services\Verification;
 
 use App\Contracts\VerificationCodeSender;
+use App\Exceptions\MailDeliveryException;
 use App\Mail\VerificationCodeMail;
 use Illuminate\Support\Facades\Mail;
+use Throwable;
 
 class EmailVerificationCodeSender implements VerificationCodeSender
 {
@@ -13,12 +15,16 @@ class EmailVerificationCodeSender implements VerificationCodeSender
         string $code,
         string $purpose
     ): void {
-        Mail::to($destination)
-            ->queue(
-                new VerificationCodeMail(
-                    code: $code,
-                    purpose: $purpose,
-                )
-            );
+        try {
+            Mail::to($destination)
+                ->send(
+                    new VerificationCodeMail(
+                        code: $code,
+                        purpose: $purpose,
+                    )
+                );
+        } catch (Throwable $exception) {
+            throw new MailDeliveryException(previous: $exception);
+        }
     }
 }

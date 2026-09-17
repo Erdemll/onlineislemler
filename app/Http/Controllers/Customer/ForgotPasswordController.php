@@ -2,11 +2,11 @@
 
 namespace App\Http\Controllers\Customer;
 
+use App\Exceptions\MailDeliveryException;
 use App\Http\Controllers\Controller;
 use App\Http\Requests\Customer\ForgotPasswordRequest;
 use App\Models\Customer;
 use App\Models\OtpVerification;
-use App\Services\Verification\SmsVerificationCodeSender;
 use App\Services\Verification\VerificationCodeService;
 use Illuminate\Http\RedirectResponse;
 use Illuminate\Http\Request;
@@ -26,34 +26,36 @@ class ForgotPasswordController extends Controller
     public function sendOtp(
         ForgotPasswordRequest $request,
         VerificationCodeService $verificationService,
-        SmsVerificationCodeSender $smsSender
     ): RedirectResponse {
-        $phone = $request->validated('phone');
+        $email = $request->validated('email');
 
         $customer = Customer::where(
-            'phone',
-            $phone
+            'email',
+            $email
         )
             ->where('is_active', true)
             ->first();
 
         /*
-         * Telefon numarasını session'a koyuyoruz.
+         * E-posta adresini session'a koyuyoruz.
          * Kullanıcı sonraki OTP ekranında tekrar
          * customer_id gönderemeyecek.
          */
         $request->session()->put(
-            'password_reset_phone',
-            $phone
+            'password_reset_email',
+            $email
         );
 
         if ($customer) {
-            $verificationService->sendVia(
-                sender: $smsSender,
-                customer: $customer,
-                purpose: 'password_reset',
-                destination: $customer->phone,
-            );
+            try {
+                $verificationService->send(
+                    customer: $customer,
+                    purpose: 'password_reset',
+                    destination: $customer->email,
+                );
+            } catch (MailDeliveryException $exception) {
+                report($exception);
+            }
         }
 
         /*
@@ -65,7 +67,7 @@ class ForgotPasswordController extends Controller
             )
             ->with(
                 'status',
-                'Bilgileriniz sistemde kayıtlıysa doğrulama kodu telefonunuza gönderilmiştir.'
+                'Bilgileriniz sistemde kayıtlıysa doğrulama kodu e-posta adresinize gönderilmiştir.'
             );
     }
 
@@ -74,7 +76,7 @@ class ForgotPasswordController extends Controller
     ): View|RedirectResponse {
         if (
             ! $request->session()
-                ->has('password_reset_phone')
+                ->has('password_reset_email')
         ) {
             return redirect()
                 ->route(
@@ -96,11 +98,11 @@ class ForgotPasswordController extends Controller
             ],
         ]);
 
-        $phone = $request->session()->get(
-            'password_reset_phone'
+        $email = $request->session()->get(
+            'password_reset_email'
         );
 
-        if (! $phone) {
+        if (! $email) {
             return redirect()
                 ->route(
                     'customer.password.request'
@@ -108,8 +110,8 @@ class ForgotPasswordController extends Controller
         }
 
         $customer = Customer::where(
-            'phone',
-            $phone
+            'email',
+            $email
         )
             ->where('is_active', true)
             ->first();
@@ -147,10 +149,10 @@ class ForgotPasswordController extends Controller
         ]);
 
         /*
-         * Kurtarma telefon numarası artık gerekli değil.
+         * Kurtarma e-posta adresi artık gerekli değil.
          */
         $request->session()->forget(
-            'password_reset_phone'
+            'password_reset_email'
         );
 
         return redirect()

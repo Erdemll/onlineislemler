@@ -25,7 +25,7 @@ class CustomerAccessTest extends TestCase
     {
         $customer = Customer::factory()
             ->create([
-                'phone_verified_at' => null,
+                'email_verified_at' => null,
             ]);
 
         $response = $this
@@ -35,14 +35,14 @@ class CustomerAccessTest extends TestCase
             );
 
         $response->assertRedirect(
-            route('customer.phone.verify')
+            route('customer.email.verify')
         );
     }
 
     public function test_verified_customer_can_access_dashboard(): void
     {
         $customer = Customer::factory()
-            ->phoneVerified()
+            ->ready()
             ->create();
 
         $response = $this

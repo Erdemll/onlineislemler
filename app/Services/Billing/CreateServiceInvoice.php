@@ -4,12 +4,14 @@ namespace App\Services\Billing;
 
 use App\Contracts\CariPlusGateway;
 use App\Enums\InvoiceStatus;
+use App\Enums\ServiceOrderStatus;
 use App\Exceptions\CariPlusException;
 use App\Models\Customer;
 use App\Models\Invoice;
+use App\Models\InvoiceItem;
 use App\Models\Service;
+use App\Models\ServiceOrder;
 use App\Services\CariPlus\ResolveCurrentAccount;
-use App\Services\CariPlus\ResolveProduct;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Str;
 
@@ -18,16 +20,19 @@ class CreateServiceInvoice
     public function __construct(
         private CariPlusGateway $cariPlus,
         private ResolveCurrentAccount $resolveCurrentAccount,
-        private ResolveProduct $resolveProduct,
     ) {}
 
     public function create(Customer $customer, Service $service): Invoice
     {
         $this->resolveCurrentAccount->for($customer);
 
+        if ($service->cari_plus_product_id === null) {
+            throw new CariPlusException('Hizmet Cari Plus ürünüyle eşleşmiyor. Önce ürün kataloğunu güncelleyin.');
+        }
+
         $invoice = DB::transaction(function () use ($customer, $service): Invoice {
             $uuid = (string) Str::uuid();
-            $grossTotal = (float) $service->price;
+            $grossTotal = $service->grossPrice();
             $taxRate = (float) $service->tax_rate;
             $subtotal = round($grossTotal / (1 + ($taxRate / 100)), 2);
 
@@ -35,7 +40,7 @@ class CreateServiceInvoice
                 'uuid' => $uuid,
                 'service_id' => $service->id,
                 'status' => InvoiceStatus::Pending,
-                'currency' => 'TRY',
+                'currency' => $service->currency,
                 'subtotal' => $subtotal,
                 'tax_amount' => $grossTotal - $subtotal,
                 'total' => $grossTotal,
@@ -46,12 +51,13 @@ class CreateServiceInvoice
 
             $invoice->items()->create([
                 'service_id' => $service->id,
+                'cari_plus_product_id' => $service->cari_plus_product_id,
                 'name' => $service->name,
                 'description' => $service->description,
                 'quantity' => 1,
-                'unit_price' => $service->price,
+                'unit_price' => $grossTotal,
                 'tax_rate' => $service->tax_rate,
-                'line_total' => $service->price,
+                'line_total' => $grossTotal,
             ]);
 
             return $invoice;
@@ -62,7 +68,92 @@ class CreateServiceInvoice
 
     public function retry(Invoice $invoice): Invoice
     {
-        return $this->send($invoice->loadMissing('customer', 'service', 'items'));
+        try {
+            $invoice = $this->send($invoice->loadMissing('customer', 'service', 'items', 'serviceOrder'));
+            $invoice->serviceOrder?->update([
+                'status' => ServiceOrderStatus::Invoiced,
+                'last_error' => null,
+            ]);
+
+            return $invoice;
+        } catch (CariPlusException $exception) {
+            $invoice->serviceOrder?->update([
+                'status' => ServiceOrderStatus::InvoiceFailed,
+                'last_error' => $exception->getMessage(),
+            ]);
+
+            throw $exception;
+        }
+    }
+
+    public function createForOrder(ServiceOrder $order): Invoice
+    {
+        $order->loadMissing('customer', 'service', 'acceptance', 'invoice');
+
+        if ($order->acceptance === null) {
+            throw new CariPlusException('Fatura oluşturulmadan önce sözleşme kabul edilmelidir.');
+        }
+
+        if ($order->invoice !== null) {
+            if ($order->invoice->status === InvoiceStatus::Unpaid) {
+                return $order->invoice;
+            }
+
+            return $this->retry($order->invoice);
+        }
+
+        $this->resolveCurrentAccount->for($order->customer);
+        $invoice = DB::transaction(function () use ($order): Invoice {
+            $lockedOrder = ServiceOrder::query()->lockForUpdate()->findOrFail($order->id);
+            $existing = Invoice::query()->whereBelongsTo($lockedOrder, 'serviceOrder')->first();
+
+            if ($existing !== null) {
+                return $existing;
+            }
+
+            $grossTotal = (float) $lockedOrder->unit_price;
+            $taxRate = (float) $lockedOrder->tax_rate;
+            $subtotal = round($grossTotal / (1 + ($taxRate / 100)), 2);
+            $invoice = $lockedOrder->customer->invoices()->create([
+                'uuid' => (string) Str::uuid(),
+                'service_id' => $lockedOrder->service_id,
+                'service_order_id' => $lockedOrder->id,
+                'status' => InvoiceStatus::Pending,
+                'currency' => $lockedOrder->currency,
+                'subtotal' => $subtotal,
+                'tax_amount' => $grossTotal - $subtotal,
+                'total' => $grossTotal,
+                'invoice_date' => today(),
+                'due_date' => today()->addDays(14),
+                'idempotency_key' => 'portal-order-'.$lockedOrder->uuid,
+            ]);
+            $invoice->items()->create([
+                'service_id' => $lockedOrder->service_id,
+                'cari_plus_product_id' => $lockedOrder->cari_plus_product_id_snapshot,
+                'name' => $lockedOrder->service_name_snapshot,
+                'description' => $lockedOrder->service_description_snapshot,
+                'quantity' => 1,
+                'unit_price' => $grossTotal,
+                'tax_rate' => $taxRate,
+                'line_total' => $grossTotal,
+            ]);
+
+            return $invoice;
+        });
+
+        try {
+            $invoice = $this->send($invoice->load('customer', 'service', 'items'));
+            $order->update(['status' => ServiceOrderStatus::Invoiced, 'last_error' => null]);
+
+            return $invoice;
+        } catch (CariPlusException $exception) {
+            $order->update([
+                'status' => ServiceOrderStatus::InvoiceFailed,
+                'last_error' => $exception->getMessage(),
+            ]);
+
+            throw $exception;
+        }
     }
 
     private function send(Invoice $invoice): Invoice
@@ -108,30 +199,38 @@ class CreateServiceInvoice
     {
         $item = $invoice->items->firstOrFail();
         $service = $invoice->service;
-        $taxRate = (float) $item->tax_rate;
-        $netUnitPrice = round(
-            (float) $item->unit_price / (1 + ($taxRate / 100)),
-            2,
-        );
+        $productId = $this->productIdFor($item, $service);
 
         $remoteItem = [
+            'product_id' => $productId,
             'description' => $item->name,
             'quantity' => (float) $item->quantity,
-            'unit_price' => $netUnitPrice,
-            'tax_rate' => $taxRate,
+            'unit_price' => (float) $item->unit_price,
+            'tax_rate' => (float) $item->tax_rate,
         ];
-
-        if ($service?->cari_plus_service_id !== null) {
-            $remoteItem['service_id'] = $service->cari_plus_service_id;
-        } elseif ($service !== null) {
-            $remoteItem['product_id'] = $this->resolveProduct->for($service);
-        }
 
         return [
             'current_account_id' => $invoice->customer->cari_plus_current_account_id,
             'invoice_date' => $invoice->invoice_date->toDateString(),
+            'currency' => $invoice->currency,
+            'price_includes_tax' => true,
             'items' => [$remoteItem],
         ];
+    }
+
+    private function productIdFor(InvoiceItem $item, ?Service $service): int
+    {
+        $productId = $item->cari_plus_product_id ?? $service?->cari_plus_product_id;
+
+        if ($productId === null) {
+            throw new CariPlusException('Fatura kalemi Cari Plus ürünüyle eşleşmiyor. Önce ürün kataloğunu güncelleyin.');
+        }
+
+        if ($item->cari_plus_product_id === null) {
+            $item->update(['cari_plus_product_id' => $productId]);
+        }
+
+        return $productId;
     }
 
     /** @param array<string, mixed> $remote */

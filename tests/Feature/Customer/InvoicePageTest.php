@@ -10,8 +10,8 @@ use Tests\Fakes\FakeCariPlusGateway;
 uses(RefreshDatabase::class);
 
 it('shows only the signed in customers invoices', function () {
-    $customer = Customer::factory()->phoneVerified()->create();
-    $otherCustomer = Customer::factory()->phoneVerified()->create();
+    $customer = Customer::factory()->ready()->create();
+    $otherCustomer = Customer::factory()->ready()->create();
     Invoice::factory()->for($customer)->create(['invoice_number' => 'FTR-BENIM']);
     Invoice::factory()->for($otherCustomer)->create(['invoice_number' => 'FTR-BASKA']);
     $this->app->instance(CariPlusGateway::class, new FakeCariPlusGateway);
@@ -27,7 +27,7 @@ it('shows only the signed in customers invoices', function () {
 });
 
 it('syncs Cari Plus invoices for the matched customer', function () {
-    $customer = Customer::factory()->phoneVerified()->create([
+    $customer = Customer::factory()->ready()->create([
         'cari_plus_current_account_id' => 55,
     ]);
     $gateway = new FakeCariPlusGateway;
@@ -60,8 +60,8 @@ it('syncs Cari Plus invoices for the matched customer', function () {
 });
 
 it('does not allow a customer to retry another customers invoice', function () {
-    $customer = Customer::factory()->phoneVerified()->create();
-    $otherCustomer = Customer::factory()->phoneVerified()->create();
+    $customer = Customer::factory()->ready()->create();
+    $otherCustomer = Customer::factory()->ready()->create();
     $invoice = Invoice::factory()->for($otherCustomer)->create([
         'status' => InvoiceStatus::Draft,
     ]);
@@ -75,7 +75,7 @@ it('does not allow a customer to retry another customers invoice', function () {
 });
 
 it('does not issue a draft imported from Cari Plus', function () {
-    $customer = Customer::factory()->phoneVerified()->create([
+    $customer = Customer::factory()->ready()->create([
         'cari_plus_current_account_id' => 55,
     ]);
     $invoice = Invoice::factory()->for($customer)->create([

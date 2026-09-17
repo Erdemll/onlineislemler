@@ -13,7 +13,7 @@ class LoginTest extends TestCase
     public function test_customer_can_login(): void
     {
         $customer = Customer::factory()
-            ->phoneVerified()
+            ->ready()
             ->create([
                 'email' => 'erdem@example.com',
             ]);
@@ -76,7 +76,7 @@ class LoginTest extends TestCase
         $this->assertGuest('customer');
     }
 
-    public function test_unverified_customer_is_redirected_to_phone_verification(): void
+    public function test_unverified_customer_is_redirected_to_email_verification(): void
     {
         $customer = Customer::factory()->create([
             'email' => 'erdem@example.com',
@@ -96,14 +96,14 @@ class LoginTest extends TestCase
         );
 
         $response->assertRedirect(
-            route('customer.phone.verify')
+            route('customer.email.verify')
         );
     }
 
     public function test_customer_can_logout(): void
     {
         $customer = Customer::factory()
-            ->phoneVerified()
+            ->ready()
             ->create();
 
         $response = $this

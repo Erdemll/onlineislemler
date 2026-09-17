@@ -8,6 +8,12 @@ interface CariPlusGateway
      * @param  array<string, mixed>  $payload
      * @return array<string, mixed>
      */
+    public function createCurrentAccount(array $payload, string $idempotencyKey): array;
+
+    /**
+     * @param  array<string, mixed>  $payload
+     * @return array<string, mixed>
+     */
     public function createSalesInvoice(array $payload, string $idempotencyKey): array;
 
     /** @return array<string, mixed> */
@@ -15,6 +21,9 @@ interface CariPlusGateway
 
     /** @return array{data: list<array<string, mixed>>, meta: array<string, mixed>} */
     public function listSalesInvoices(int $currentAccountId, int $page = 1): array;
+
+    /** @return array{data: list<array<string, mixed>>, meta: array<string, mixed>} */
+    public function listProducts(int $page = 1, bool $archived = false): array;
 
     public function findCurrentAccountIdByCode(string $code): ?int;
 

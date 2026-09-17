@@ -2,6 +2,7 @@
 
 namespace Tests\Feature\Customer;
 
+use App\Contracts\CariPlusGateway;
 use App\Mail\VerificationCodeMail;
 use App\Models\Customer;
 use App\Models\OtpVerification;
@@ -9,6 +10,7 @@ use App\Services\Verification\VerificationCodeService;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 use Illuminate\Support\Facades\Hash;
 use Illuminate\Support\Facades\Mail;
+use Tests\Fakes\FakeCariPlusGateway;
 use Tests\TestCase;
 
 class EmailVerificationTest extends TestCase
@@ -20,6 +22,7 @@ class EmailVerificationTest extends TestCase
         parent::setUp();
 
         Mail::fake();
+        $this->app->instance(CariPlusGateway::class, new FakeCariPlusGateway);
     }
 
     public function test_unverified_customer_can_view_email_verification_form(): void
@@ -54,7 +57,7 @@ class EmailVerificationTest extends TestCase
 
         $code = null;
 
-        Mail::assertQueued(
+        Mail::assertSent(
             VerificationCodeMail::class,
             function (VerificationCodeMail $mail) use (&$code) {
                 $code = $mail->code;
@@ -215,7 +218,7 @@ class EmailVerificationTest extends TestCase
 
         $code = null;
 
-        Mail::assertQueued(
+        Mail::assertSent(
             VerificationCodeMail::class,
             function (VerificationCodeMail $mail) use (&$code) {
                 $code = $mail->code;
@@ -321,12 +324,12 @@ class EmailVerificationTest extends TestCase
             'status'
         );
 
-        Mail::assertQueued(
+        Mail::assertSent(
             VerificationCodeMail::class,
             1
         );
 
-        Mail::assertQueued(
+        Mail::assertSent(
             VerificationCodeMail::class,
             function (VerificationCodeMail $mail) use ($customer) {
                 return $mail->hasTo(
@@ -340,9 +343,7 @@ class EmailVerificationTest extends TestCase
 
     public function test_verified_customer_does_not_receive_another_verification_mail(): void
     {
-        $customer = Customer::factory()->create([
-            'email_verified_at' => now(),
-        ]);
+        $customer = Customer::factory()->ready()->create();
 
         $response = $this
             ->actingAsCustomer($customer)
@@ -356,6 +357,6 @@ class EmailVerificationTest extends TestCase
             route('customer.dashboard')
         );
 
-        Mail::assertNothingQueued();
+        Mail::assertNothingSent();
     }
 }

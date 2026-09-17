@@ -46,7 +46,7 @@ class CustomerPagesTest extends TestCase
         string $view,
         string $heading,
     ): void {
-        $customer = Customer::factory()->phoneVerified()->create();
+        $customer = Customer::factory()->ready()->create();
 
         $response = $this
             ->actingAsCustomer($customer)
@@ -81,6 +81,6 @@ class CustomerPagesTest extends TestCase
             ->actingAsCustomer($customer)
             ->get(route($route));
 
-        $response->assertRedirect(route('customer.phone.verify'));
+        $response->assertRedirect(route('customer.email.verify'));
     }
 }

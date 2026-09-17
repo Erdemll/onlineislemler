@@ -2,7 +2,6 @@
 
 namespace App\Http\Requests\Customer;
 
-use App\Support\PhoneNormalizer;
 use Illuminate\Contracts\Validation\ValidationRule;
 use Illuminate\Foundation\Http\FormRequest;
 
@@ -19,7 +18,9 @@ class ForgotPasswordRequest extends FormRequest
     protected function prepareForValidation(): void
     {
         $this->merge([
-            'phone' => PhoneNormalizer::normalize($this->phone),
+            'email' => mb_strtolower(
+                trim((string) $this->input('email'))
+            ),
         ]);
     }
 
@@ -31,9 +32,10 @@ class ForgotPasswordRequest extends FormRequest
     public function rules(): array
     {
         return [
-            'phone' => [
+            'email' => [
                 'required',
-                'regex:/^\+905[0-9]{9}$/',
+                'email',
+                'max:255',
             ],
         ];
     }

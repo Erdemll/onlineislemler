@@ -13,6 +13,19 @@ use Throwable;
 
 class CariPlusClient implements CariPlusGateway
 {
+    public function createCurrentAccount(array $payload, string $idempotencyKey): array
+    {
+        try {
+            $response = $this->authorizedRequest()
+                ->withHeader('Idempotency-Key', $idempotencyKey)
+                ->post('/current-accounts', $payload);
+        } catch (ConnectionException $exception) {
+            throw new CariPlusException('Cari Plus servisine şu anda ulaşılamıyor.', previous: $exception);
+        }
+
+        return $this->dataFrom($response, 201);
+    }
+
     public function createSalesInvoice(array $payload, string $idempotencyKey): array
     {
         try {
@@ -47,6 +60,29 @@ class CariPlusClient implements CariPlusGateway
                 'page' => $page,
                 'per_page' => 200,
                 'sort' => '-invoice_date',
+            ]);
+        } catch (ConnectionException $exception) {
+            throw new CariPlusException('Cari Plus servisine şu anda ulaşılamıyor.', previous: $exception);
+        }
+
+        if (! $response->successful()) {
+            throw $this->exceptionFrom($response);
+        }
+
+        return [
+            'data' => $response->json('data', []),
+            'meta' => $response->json('meta', []),
+        ];
+    }
+
+    public function listProducts(int $page = 1, bool $archived = false): array
+    {
+        try {
+            $response = $this->authorizedRequest()->get('/products', [
+                'page' => $page,
+                'per_page' => 200,
+                'archived' => $archived ? 'true' : 'false',
+                'sort' => 'created_at',
             ]);
         } catch (ConnectionException $exception) {
             throw new CariPlusException('Cari Plus servisine şu anda ulaşılamıyor.', previous: $exception);

@@ -8,6 +8,17 @@ use App\Exceptions\CariPlusException;
 class FakeCariPlusGateway implements CariPlusGateway
 {
     /** @var list<array{payload: array<string, mixed>, idempotency_key: string}> */
+    public array $createdCurrentAccounts = [];
+
+    public ?CariPlusException $currentAccountCreateException = null;
+
+    /** @var array<string, mixed> */
+    public array $currentAccountResponse = [
+        'id' => 701,
+        'code' => 'MUS000701',
+    ];
+
+    /** @var list<array{payload: array<string, mixed>, idempotency_key: string}> */
     public array $created = [];
 
     /** @var list<array{invoice_id: int, idempotency_key: string}> */
@@ -24,6 +35,8 @@ class FakeCariPlusGateway implements CariPlusGateway
 
     public ?CariPlusException $listException = null;
 
+    public ?CariPlusException $productListException = null;
+
     public ?int $currentAccountId = 55;
 
     /** @var list<string> */
@@ -36,6 +49,29 @@ class FakeCariPlusGateway implements CariPlusGateway
 
     /** @var list<array{payload: array<string, mixed>, idempotency_key: string}> */
     public array $createdProducts = [];
+
+    /** @var list<array<string, mixed>> */
+    public array $remoteProducts = [];
+
+    /** @var list<array<string, mixed>> */
+    public array $archivedProducts = [];
+
+    /** @var list<array{page: int, archived: bool}> */
+    public array $listedProducts = [];
+
+    public function createCurrentAccount(array $payload, string $idempotencyKey): array
+    {
+        if ($this->currentAccountCreateException !== null) {
+            throw $this->currentAccountCreateException;
+        }
+
+        $this->createdCurrentAccounts[] = [
+            'payload' => $payload,
+            'idempotency_key' => $idempotencyKey,
+        ];
+
+        return $this->currentAccountResponse;
+    }
 
     public function createSalesInvoice(array $payload, string $idempotencyKey): array
     {
@@ -95,6 +131,23 @@ class FakeCariPlusGateway implements CariPlusGateway
 
         return [
             'data' => $this->remoteInvoices,
+            'meta' => ['page' => $page, 'total_pages' => 1],
+        ];
+    }
+
+    public function listProducts(int $page = 1, bool $archived = false): array
+    {
+        if ($this->productListException !== null) {
+            throw $this->productListException;
+        }
+
+        $this->listedProducts[] = [
+            'page' => $page,
+            'archived' => $archived,
+        ];
+
+        return [
+            'data' => $archived ? $this->archivedProducts : $this->remoteProducts,
             'meta' => ['page' => $page, 'total_pages' => 1],
         ];
     }

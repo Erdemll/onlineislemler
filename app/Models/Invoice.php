@@ -19,6 +19,7 @@ class Invoice extends Model
         'uuid',
         'customer_id',
         'service_id',
+        'service_order_id',
         'cari_plus_invoice_id',
         'invoice_number',
         'status',
@@ -60,6 +61,11 @@ class Invoice extends Model
     public function service(): BelongsTo
     {
         return $this->belongsTo(Service::class);
+    }
+
+    public function serviceOrder(): BelongsTo
+    {
+        return $this->belongsTo(ServiceOrder::class);
     }
 
     public function items(): HasMany

@@ -1,5 +1,6 @@
 <?php
 
+use App\Http\Middleware\EnsureCustomerCariPlusAccountIsReady;
 use App\Http\Middleware\EnsureCustomerEmailIsVerified;
 use App\Http\Middleware\EnsureCustomerPhoneIsVerified;
 use App\Http\Middleware\EnsureCustomerSessionIsCurrent;
@@ -16,13 +17,16 @@ return Application::configure(basePath: dirname(__DIR__))
     )
     ->withMiddleware(function (Middleware $middleware): void {
         $middleware->alias([
+            'customer.cari_plus.ready' => EnsureCustomerCariPlusAccountIsReady::class,
             'customer.email.verified' => EnsureCustomerEmailIsVerified::class,
             'customer.phone.verified' => EnsureCustomerPhoneIsVerified::class,
 
             'customer.session.current' => EnsureCustomerSessionIsCurrent::class,
         ]);
         $middleware->redirectGuestsTo(
-            fn (Request $request) => route('customer.login')
+            fn (Request $request) => $request->is('admin', 'admin/*')
+                ? route('admin.login')
+                : route('customer.login')
         );
     })
     ->withExceptions(function (Exceptions $exceptions): void {

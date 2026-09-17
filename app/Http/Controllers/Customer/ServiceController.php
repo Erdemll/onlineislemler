@@ -13,13 +13,25 @@ class ServiceController extends Controller
     public function index(Request $request, CariPlusGateway $cariPlus): View
     {
         $services = Service::query()
+            ->with(['contractVersions' => fn ($query) => $query
+                ->whereNotNull('published_at')
+                ->where('effective_at', '<=', now())
+                ->where('contract_service.is_required', true)
+                ->orderByDesc('effective_at')])
             ->where('is_active', true)
-            ->orderBy('price')
+            ->whereNotNull('cari_plus_product_id')
+            ->orderBy('name')
             ->orderBy('id')
             ->get();
 
         return view('customer.services.index', [
             'services' => $services,
+            'lastSyncedAt' => Service::query()
+                ->whereNotNull('cari_plus_product_id')
+                ->whereNotNull('synced_at')
+                ->latest('synced_at')
+                ->first()?->synced_at,
+            'canSync' => $cariPlus->isConfigured(),
             'canPurchase' => $cariPlus->isConfigured()
                 && ($request->user('customer')->cari_plus_current_account_id !== null
                     || filled($request->user('customer')->cari_plus_current_account_code)),

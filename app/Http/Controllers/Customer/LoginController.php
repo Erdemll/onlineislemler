@@ -40,10 +40,10 @@ class LoginController extends Controller
             $customer->session_version
         );
 
-        if (! $customer->phone_verified_at) {
+        if (! $customer->email_verified_at || $customer->cari_plus_current_account_id === null) {
             return redirect()
                 ->route(
-                    'customer.phone.verify'
+                    'customer.email.verify'
                 );
         }
 

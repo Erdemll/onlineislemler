@@ -2,45 +2,43 @@
 
 namespace Tests\Feature\Customer;
 
-use App\Contracts\SmsSender;
+use App\Contracts\VerificationCodeSender;
+use App\Exceptions\MailDeliveryException;
+use App\Mail\VerificationCodeMail;
 use App\Models\Customer;
 use App\Models\OtpVerification;
 use App\Services\Auth\PasswordResetService;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 use Illuminate\Support\Facades\Hash;
-use Tests\Fakes\FakeSmsSender;
+use Illuminate\Support\Facades\Mail;
 use Tests\TestCase;
 
 class PasswordResetTest extends TestCase
 {
     use RefreshDatabase;
 
-    private FakeSmsSender $sms;
-
     protected function setUp(): void
     {
         parent::setUp();
 
-        $this->sms = new FakeSmsSender;
-
-        $this->app->instance(SmsSender::class, $this->sms);
+        Mail::fake();
     }
 
-    public function test_password_reset_request_form_uses_phone(): void
+    public function test_password_reset_request_form_uses_email(): void
     {
         $response = $this->get(route('customer.password.request'));
 
         $response
             ->assertOk()
-            ->assertSee('name="phone"', false)
-            ->assertDontSee('name="email"', false);
+            ->assertSee('name="email"', false)
+            ->assertDontSee('name="phone"', false);
     }
 
     public function test_password_reset_code_form_is_available_after_request(): void
     {
         $response = $this
             ->withSession([
-                'password_reset_phone' => '+905551112233',
+                'password_reset_email' => 'erdem@example.com',
             ])
             ->get(route('customer.password.otp.form'));
 
@@ -52,13 +50,13 @@ class PasswordResetTest extends TestCase
     public function test_existing_customer_can_request_password_reset_code(): void
     {
         $customer = Customer::factory()->create([
-            'phone' => '+905551112233',
+            'email' => 'erdem@example.com',
         ]);
 
         $response = $this->post(
             route('customer.password.send'),
             [
-                'phone' => '0555 111 22 33',
+                'email' => 'ERDEM@example.com',
             ]
         );
 
@@ -68,11 +66,14 @@ class PasswordResetTest extends TestCase
 
         $response->assertSessionHas(
             'status',
-            'Bilgileriniz sistemde kayıtlıysa doğrulama kodu telefonunuza gönderilmiştir.'
+            'Bilgileriniz sistemde kayıtlıysa doğrulama kodu e-posta adresinize gönderilmiştir.'
         );
 
-        $this->assertCount(1, $this->sms->sent);
-        $this->assertSame('+905551112233', $this->sms->sent[0]['phone']);
+        Mail::assertSent(
+            VerificationCodeMail::class,
+            fn (VerificationCodeMail $mail): bool => $mail->hasTo($customer->email)
+                && $mail->purpose === 'password_reset',
+        );
 
         $this->assertDatabaseHas(
             'otp_verifications',
@@ -83,12 +84,12 @@ class PasswordResetTest extends TestCase
         );
     }
 
-    public function test_non_existing_phone_gets_same_response_without_sms(): void
+    public function test_non_existing_email_gets_same_response_without_mail(): void
     {
         $response = $this->post(
             route('customer.password.send'),
             [
-                'phone' => '0555 999 88 77',
+                'email' => 'bulunamadi@example.com',
             ]
         );
 
@@ -98,10 +99,10 @@ class PasswordResetTest extends TestCase
 
         $response->assertSessionHas(
             'status',
-            'Bilgileriniz sistemde kayıtlıysa doğrulama kodu telefonunuza gönderilmiştir.'
+            'Bilgileriniz sistemde kayıtlıysa doğrulama kodu e-posta adresinize gönderilmiştir.'
         );
 
-        $this->assertCount(0, $this->sms->sent);
+        Mail::assertNothingSent();
 
         $this->assertDatabaseCount(
             'otp_verifications',
@@ -109,22 +110,22 @@ class PasswordResetTest extends TestCase
         );
     }
 
-    public function test_inactive_customer_does_not_receive_reset_sms(): void
+    public function test_inactive_customer_does_not_receive_reset_mail(): void
     {
         Customer::factory()
             ->inactive()
             ->create([
-                'phone' => '+905551112233',
+                'email' => 'erdem@example.com',
             ]);
 
         $this->post(
             route('customer.password.send'),
             [
-                'phone' => '05551112233',
+                'email' => 'erdem@example.com',
             ]
         );
 
-        $this->assertCount(0, $this->sms->sent);
+        Mail::assertNothingSent();
 
         $this->assertDatabaseCount(
             'otp_verifications',
@@ -132,10 +133,37 @@ class PasswordResetTest extends TestCase
         );
     }
 
+    public function test_mail_failure_does_not_reveal_that_password_reset_account_exists(): void
+    {
+        Customer::factory()->create([
+            'email' => 'erdem@example.com',
+        ]);
+        $this->app->instance(VerificationCodeSender::class, new class implements VerificationCodeSender
+        {
+            public function send(string $destination, string $code, string $purpose): void
+            {
+                throw new MailDeliveryException;
+            }
+        });
+
+        $response = $this->post(
+            route('customer.password.send'),
+            ['email' => 'erdem@example.com']
+        );
+
+        $response
+            ->assertRedirect(route('customer.password.otp.form'))
+            ->assertSessionHas(
+                'status',
+                'Bilgileriniz sistemde kayıtlıysa doğrulama kodu e-posta adresinize gönderilmiştir.'
+            );
+        $this->assertDatabaseCount('otp_verifications', 0);
+    }
+
     public function test_password_reset_code_is_not_stored_as_plain_text(): void
     {
         $customer = Customer::factory()->create([
-            'phone' => '+905551112233',
+            'email' => 'erdem@example.com',
         ]);
 
         app(PasswordResetService::class)->sendOtp($customer);
@@ -168,7 +196,7 @@ class PasswordResetTest extends TestCase
     public function test_customer_can_verify_valid_password_reset_code(): void
     {
         $customer = Customer::factory()->create([
-            'phone' => '+905551112233',
+            'email' => 'erdem@example.com',
         ]);
 
         app(PasswordResetService::class)->sendOtp($customer);
@@ -177,7 +205,7 @@ class PasswordResetTest extends TestCase
 
         $response = $this
             ->withSession([
-                'password_reset_phone' => $customer->phone,
+                'password_reset_email' => $customer->email,
             ])
             ->post(
                 route('customer.password.otp.verify'),
@@ -217,14 +245,14 @@ class PasswordResetTest extends TestCase
     public function test_wrong_password_reset_code_is_rejected(): void
     {
         $customer = Customer::factory()->create([
-            'phone' => '+905551112233',
+            'email' => 'erdem@example.com',
         ]);
 
         app(PasswordResetService::class)->sendOtp($customer);
 
         $response = $this
             ->withSession([
-                'password_reset_phone' => $customer->phone,
+                'password_reset_email' => $customer->email,
             ])
             ->post(
                 route('customer.password.otp.verify'),
@@ -248,7 +276,7 @@ class PasswordResetTest extends TestCase
     public function test_expired_password_reset_code_is_rejected(): void
     {
         $customer = Customer::factory()->create([
-            'phone' => '+905551112233',
+            'email' => 'erdem@example.com',
         ]);
 
         OtpVerification::create([
@@ -261,7 +289,7 @@ class PasswordResetTest extends TestCase
 
         $response = $this
             ->withSession([
-                'password_reset_phone' => $customer->phone,
+                'password_reset_email' => $customer->email,
             ])
             ->post(
                 route('customer.password.otp.verify'),
@@ -282,7 +310,7 @@ class PasswordResetTest extends TestCase
     public function test_password_reset_code_is_blocked_after_five_failed_attempts(): void
     {
         $customer = Customer::factory()->create([
-            'phone' => '+905551112233',
+            'email' => 'erdem@example.com',
         ]);
 
         OtpVerification::create([
@@ -295,7 +323,7 @@ class PasswordResetTest extends TestCase
 
         $response = $this
             ->withSession([
-                'password_reset_phone' => $customer->phone,
+                'password_reset_email' => $customer->email,
             ])
             ->post(
                 route('customer.password.otp.verify'),
@@ -316,7 +344,7 @@ class PasswordResetTest extends TestCase
     public function test_password_reset_code_cannot_be_used_twice(): void
     {
         $customer = Customer::factory()->create([
-            'phone' => '+905551112233',
+            'email' => 'erdem@example.com',
         ]);
 
         app(PasswordResetService::class)->sendOtp($customer);
@@ -325,7 +353,7 @@ class PasswordResetTest extends TestCase
 
         $this
             ->withSession([
-                'password_reset_phone' => $customer->phone,
+                'password_reset_email' => $customer->email,
             ])
             ->post(
                 route('customer.password.otp.verify'),
@@ -339,7 +367,7 @@ class PasswordResetTest extends TestCase
 
         $response = $this
             ->withSession([
-                'password_reset_phone' => $customer->phone,
+                'password_reset_email' => $customer->email,
             ])
             ->post(
                 route('customer.password.otp.verify'),
@@ -356,7 +384,7 @@ class PasswordResetTest extends TestCase
     public function test_new_password_reset_code_invalidates_old_code(): void
     {
         $customer = Customer::factory()->create([
-            'phone' => '+905551112233',
+            'email' => 'erdem@example.com',
         ]);
 
         $service = app(PasswordResetService::class);
@@ -523,7 +551,7 @@ class PasswordResetTest extends TestCase
     public function test_new_password_allows_login_after_reset(): void
     {
         $customer = Customer::factory()
-            ->phoneVerified()
+            ->ready()
             ->create([
                 'email' => 'erdem@example.com',
 
@@ -567,7 +595,16 @@ class PasswordResetTest extends TestCase
 
     private function getLastSentCode(): string
     {
-        $code = $this->sms->lastCode();
+        $code = null;
+
+        Mail::assertSent(
+            VerificationCodeMail::class,
+            function (VerificationCodeMail $mail) use (&$code): bool {
+                $code = $mail->code;
+
+                return true;
+            }
+        );
 
         $this->assertNotNull($code);
 

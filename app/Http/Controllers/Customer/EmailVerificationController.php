@@ -2,7 +2,9 @@
 
 namespace App\Http\Controllers\Customer;
 
+use App\Exceptions\CariPlusException;
 use App\Http\Controllers\Controller;
+use App\Services\CariPlus\ProvisionCurrentAccount;
 use App\Services\Verification\VerificationCodeService;
 use Illuminate\Http\RedirectResponse;
 use Illuminate\Http\Request;
@@ -16,21 +18,22 @@ class EmailVerificationController extends Controller
             'customer'
         )->user();
 
-        if ($customer->email_verified_at) {
+        if ($customer->email_verified_at && $customer->cari_plus_current_account_id !== null) {
             return redirect()
                 ->route(
                     'customer.dashboard'
                 );
         }
 
-        return view(
-            'customer.auth.verify-email'
-        );
+        return view('customer.auth.verify-email', [
+            'provisionPending' => $customer->email_verified_at !== null,
+        ]);
     }
 
     public function verify(
         Request $request,
-        VerificationCodeService $verificationService
+        VerificationCodeService $verificationService,
+        ProvisionCurrentAccount $provision,
     ): RedirectResponse {
         $request->validate([
             'code' => [
@@ -45,9 +48,9 @@ class EmailVerificationController extends Controller
 
         if ($customer->email_verified_at) {
             return redirect()
-                ->route(
-                    'customer.dashboard'
-                );
+                ->route($customer->cari_plus_current_account_id === null
+                    ? 'customer.email.verify'
+                    : 'customer.dashboard');
         }
 
         $valid = $verificationService->verify(
@@ -66,6 +69,16 @@ class EmailVerificationController extends Controller
             'email_verified_at' => now(),
         ])->save();
 
+        try {
+            $provision->handle($customer);
+        } catch (CariPlusException $exception) {
+            report($exception);
+
+            return redirect()->route('customer.email.verify')->withErrors([
+                'provision' => 'E-posta adresiniz doğrulandı ancak müşteri hesabınız şu anda oluşturulamadı. Lütfen tekrar deneyin.',
+            ]);
+        }
+
         return redirect()
             ->route(
                 'customer.dashboard'
@@ -81,9 +94,9 @@ class EmailVerificationController extends Controller
 
         if ($customer->email_verified_at) {
             return redirect()
-                ->route(
-                    'customer.dashboard'
-                );
+                ->route($customer->cari_plus_current_account_id === null
+                    ? 'customer.email.verify'
+                    : 'customer.dashboard');
         }
 
         $verificationService->send(

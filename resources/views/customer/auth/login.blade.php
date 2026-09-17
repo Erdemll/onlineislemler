@@ -10,7 +10,7 @@
                 <h1 class="max-w-md text-4xl font-semibold leading-[1.05] tracking-[-0.045em] sm:text-5xl">Hesabına dön.</h1>
                 <p class="max-w-sm text-sm leading-6 text-slate-300">Fatura, abonelik ve destek işlemlerine tek bir güvenli oturumdan ulaş.</p>
             </div>
-            <div class="border-t border-slate-700 pt-5 text-xs leading-5 text-slate-400">Şifreni kimseyle paylaşma. Doğrulama kodları yalnızca kayıtlı telefonuna gönderilir.</div>
+            <div class="border-t border-slate-700 pt-5 text-xs leading-5 text-slate-400">Şifreni kimseyle paylaşma. Doğrulama kodları yalnızca kayıtlı e-posta adresine gönderilir.</div>
         </div>
 
         <div class="p-7 sm:p-10 lg:p-14">
@@ -30,7 +30,7 @@
                     <div class="grid gap-2">
                         <div class="flex items-center justify-between gap-4">
                             <label class="text-sm font-semibold" for="password">Şifre</label>
-                            <a class="text-xs font-semibold text-[#1746d1] underline-offset-4 hover:underline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-[#1746d1]" href="{{ route('customer.password.request') }}">Şifremi unuttum</a>
+                            <a class="inline-flex min-h-11 items-center text-xs font-semibold text-[#1746d1] underline-offset-4 hover:underline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-[#1746d1]" href="{{ route('customer.password.request') }}">Şifremi unuttum</a>
                         </div>
                         <input class="min-h-12 w-full border-2 border-slate-950 bg-white px-3.5 py-2.5 text-base outline-none transition focus:border-[#1746d1] focus:ring-2 focus:ring-[#1746d1]/20" id="password" type="password" name="password" autocomplete="current-password" required>
                         @error('password')
@@ -46,7 +46,7 @@
                     <x-customer.submit label="Giriş yap" />
                 </form>
 
-                <p class="border-t border-slate-200 pt-5 text-sm text-slate-600">Henüz hesabın yok mu? <a class="font-bold text-slate-950 underline decoration-2 underline-offset-4" href="{{ route('customer.register') }}">Hesap oluştur</a></p>
+                <p class="flex flex-wrap items-center gap-x-1 border-t border-slate-200 pt-5 text-sm text-slate-600">Henüz hesabın yok mu? <a class="inline-flex min-h-11 items-center font-bold text-slate-950 underline decoration-2 underline-offset-4" href="{{ route('customer.register') }}">Hesap oluştur</a></p>
             </div>
         </div>
     </div>

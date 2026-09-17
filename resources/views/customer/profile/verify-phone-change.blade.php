@@ -15,7 +15,7 @@
                 <x-customer.input class="text-center font-mono text-2xl font-semibold tracking-[0.35em]" name="code" label="Doğrulama kodu" type="text" hint="6 hane" inputmode="numeric" autocomplete="one-time-code" maxlength="6" pattern="[0-9]{6}" required autofocus />
                 <x-customer.submit label="Telefon numarasını değiştir" />
             </form>
-            <a class="text-sm font-bold underline decoration-2 underline-offset-4" href="{{ route('customer.profile') }}">Profil sayfasına dön</a>
+            <a class="inline-flex min-h-11 items-center text-sm font-bold underline decoration-2 underline-offset-4" href="{{ route('customer.profile') }}">Profil sayfasına dön</a>
         </div>
     </div>
 @endsection

@@ -38,7 +38,7 @@
                 <p class="text-sm text-slate-600">Kod gelmedi mi?</p>
                 <form method="POST" action="{{ route('customer.phone.resend') }}">
                     @csrf
-                    <button class="text-left text-sm font-bold text-[#1746d1] underline decoration-2 underline-offset-4 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-[#1746d1]" type="submit">Kodu tekrar gönder</button>
+                    <button class="inline-flex min-h-11 items-center text-left text-sm font-bold text-[#1746d1] underline decoration-2 underline-offset-4 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-[#1746d1]" type="submit">Kodu tekrar gönder</button>
                 </form>
             </div>
         </div>

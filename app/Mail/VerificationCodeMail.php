@@ -3,21 +3,15 @@
 namespace App\Mail;
 
 use Illuminate\Bus\Queueable;
-use Illuminate\Contracts\Queue\ShouldQueue;
 use Illuminate\Mail\Mailable;
 use Illuminate\Mail\Mailables\Attachment;
 use Illuminate\Mail\Mailables\Content;
 use Illuminate\Mail\Mailables\Envelope;
 use Illuminate\Queue\SerializesModels;
 
-class VerificationCodeMail extends Mailable implements ShouldQueue
+class VerificationCodeMail extends Mailable
 {
     use Queueable, SerializesModels;
-
-    public int $tries = 3;
-
-    /** @var list<int> */
-    public array $backoff = [60, 300];
 
     /**
      * Create a new message instance.
@@ -25,9 +19,7 @@ class VerificationCodeMail extends Mailable implements ShouldQueue
     public function __construct(
         public string $code,
         public string $purpose,
-    ) {
-        $this->afterCommit();
-    }
+    ) {}
 
     /**
      * Get the message envelope.

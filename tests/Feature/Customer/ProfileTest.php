@@ -25,7 +25,7 @@ class ProfileTest extends TestCase
 
     public function test_verified_customer_can_view_profile(): void
     {
-        $customer = Customer::factory()->phoneVerified()->create();
+        $customer = Customer::factory()->ready()->phoneVerified()->create();
 
         $response = $this
             ->actingAsCustomer($customer)
@@ -39,7 +39,7 @@ class ProfileTest extends TestCase
 
     public function test_verified_customer_can_update_profile(): void
     {
-        $customer = Customer::factory()->phoneVerified()->create();
+        $customer = Customer::factory()->ready()->phoneVerified()->create();
 
         $response = $this
             ->actingAsCustomer($customer)
@@ -59,7 +59,7 @@ class ProfileTest extends TestCase
 
     public function test_phone_change_code_is_sent_to_new_phone(): void
     {
-        $customer = Customer::factory()->phoneVerified()->create([
+        $customer = Customer::factory()->ready()->phoneVerified()->create([
             'email' => 'erdem@example.com',
             'phone' => '+905551112233',
         ]);
@@ -86,7 +86,7 @@ class ProfileTest extends TestCase
 
     public function test_customer_can_confirm_phone_change_with_sms_code(): void
     {
-        $customer = Customer::factory()->phoneVerified()->create([
+        $customer = Customer::factory()->ready()->phoneVerified()->create([
             'email' => 'erdem@example.com',
             'phone' => '+905551112233',
             'phone_verified_at' => now(),
@@ -123,7 +123,7 @@ class ProfileTest extends TestCase
 
     public function test_wrong_current_password_does_not_start_phone_change(): void
     {
-        $customer = Customer::factory()->phoneVerified()->create();
+        $customer = Customer::factory()->ready()->phoneVerified()->create();
 
         $response = $this
             ->actingAsCustomer($customer)

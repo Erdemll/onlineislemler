@@ -13,7 +13,7 @@ class SessionSecurityTest extends TestCase
     public function test_current_session_version_allows_access(): void
     {
         $customer = Customer::factory()
-            ->phoneVerified()
+            ->ready()
             ->create([
                 'session_version' => 3,
             ]);
@@ -36,7 +36,7 @@ class SessionSecurityTest extends TestCase
     public function test_old_session_version_forces_logout(): void
     {
         $customer = Customer::factory()
-            ->phoneVerified()
+            ->ready()
             ->create([
                 'session_version' => 5,
             ]);
@@ -65,7 +65,7 @@ class SessionSecurityTest extends TestCase
     public function test_missing_session_version_forces_logout(): void
     {
         $customer = Customer::factory()
-            ->phoneVerified()
+            ->ready()
             ->create([
                 'session_version' => 2,
             ]);

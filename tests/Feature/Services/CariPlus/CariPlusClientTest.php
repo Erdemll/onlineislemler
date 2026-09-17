@@ -22,6 +22,28 @@ beforeEach(function () {
     Http::preventStrayRequests();
 });
 
+it('creates an idempotent current account', function () {
+    Cache::put('cari_plus.access_token', 'cached-token', now()->addMinutes(10));
+    Http::fake([
+        'api.cariplus.test/v1/current-accounts' => Http::response([
+            'data' => ['id' => 701, 'code' => 'MUS000701'],
+        ], 201),
+    ]);
+
+    $account = (new CariPlusClient)->createCurrentAccount([
+        'type' => 'customer',
+        'title' => 'Erdem Lale',
+        'is_individual' => true,
+    ], 'portal-customer-uuid');
+
+    expect($account)->toMatchArray(['id' => 701, 'code' => 'MUS000701']);
+    Http::assertSent(fn (Request $request): bool => $request->url() === 'https://api.cariplus.test/v1/current-accounts'
+        && $request->hasHeader('Idempotency-Key', 'portal-customer-uuid')
+        && $request['type'] === 'customer'
+        && $request['is_individual'] === true
+    );
+});
+
 it('authenticates and sends an idempotent sales invoice request', function () {
     Http::fake([
         'api.cariplus.test/v1/auth/token' => Http::response([
@@ -98,6 +120,27 @@ it('resolves a current account by its exact code', function () {
 
     expect($id)->toBe(501);
     Http::assertSent(fn (Request $request): bool => $request->url() === 'https://api.cariplus.test/v1/current-accounts?code=MUS000001&per_page=1'
+        && $request->hasHeader('Authorization', 'Bearer cached-token')
+    );
+});
+
+it('lists active and archived product pages with the documented page size', function () {
+    Cache::put('cari_plus.access_token', 'cached-token', now()->addMinutes(10));
+    Http::fake([
+        'api.cariplus.test/v1/products*' => Http::response([
+            'data' => [[
+                'id' => 501,
+                'name' => 'Statik IP',
+            ]],
+            'meta' => ['page' => 2, 'total_pages' => 3],
+        ]),
+    ]);
+
+    $result = (new CariPlusClient)->listProducts(2, true);
+
+    expect($result['data'][0]['id'])->toBe(501)
+        ->and($result['meta']['total_pages'])->toBe(3);
+    Http::assertSent(fn (Request $request): bool => $request->url() === 'https://api.cariplus.test/v1/products?page=2&per_page=200&archived=true&sort=created_at'
         && $request->hasHeader('Authorization', 'Bearer cached-token')
     );
 });

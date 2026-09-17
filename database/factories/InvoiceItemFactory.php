@@ -21,6 +21,7 @@ class InvoiceItemFactory extends Factory
         return [
             'invoice_id' => Invoice::factory(),
             'service_id' => null,
+            'cari_plus_product_id' => null,
             'name' => fake()->words(3, true),
             'description' => fake()->sentence(),
             'quantity' => 1,
