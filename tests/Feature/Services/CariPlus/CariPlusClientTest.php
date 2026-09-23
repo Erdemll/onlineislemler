@@ -117,6 +117,26 @@ it('uses the cached access token for following requests', function () {
     );
 });
 
+it('reads a single sales invoice with its line items', function () {
+    cacheCariPlusToken('cached-token');
+    Http::fake([
+        'api.cariplus.test/v1/sales-invoices/902' => Http::response([
+            'data' => [
+                'id' => 902,
+                'current_account' => ['id' => 55],
+                'items' => [['description' => 'Kurulum hizmeti']],
+            ],
+        ]),
+    ]);
+
+    $invoice = (new CariPlusClient)->getSalesInvoice(902);
+
+    expect($invoice['items'][0]['description'])->toBe('Kurulum hizmeti');
+    Http::assertSent(fn (Request $request): bool => $request->method() === 'GET'
+        && $request->url() === 'https://api.cariplus.test/v1/sales-invoices/902'
+        && $request->hasHeader('Authorization', 'Bearer cached-token'));
+});
+
 it('refreshes an expired access token once after a 401 response', function () {
     cacheCariPlusToken('expired-token');
     Http::fake([

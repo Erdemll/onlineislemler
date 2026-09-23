@@ -39,7 +39,7 @@
                 <a class="inline-flex min-h-11 items-center text-sm font-bold text-[#1746d1] underline decoration-2 underline-offset-4" href="{{ route('customer.service-orders.contract.show', $serviceOrder) }}">İmzayı yeniden oluştur</a>
             </div>
         @else
-            <div class="grid gap-6 lg:grid-cols-[1.35fr_0.65fr]">
+            <div class="grid gap-6 xl:grid-cols-[1.35fr_0.65fr]">
                 <div class="overflow-hidden border-2 border-slate-950 bg-white">
                     <div class="flex flex-wrap items-center justify-between gap-3 border-b-2 border-slate-950 px-4 py-3">
                         <strong class="text-sm">Sözleşmenin tamamı</strong>

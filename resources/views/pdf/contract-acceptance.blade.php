@@ -4,17 +4,17 @@
     <meta charset="UTF-8">
     <style>
         @page { margin: 34px 42px; }
-        body { color: #0f172a; font-family: "DejaVu Sans", sans-serif; font-size: 10px; line-height: 1.45; }
-        h1 { font-size: 21px; margin: 0 0 6px; }
-        h2 { border-bottom: 1px solid #0f172a; font-size: 12px; margin: 20px 0 8px; padding-bottom: 5px; }
+        body { color: #172033; font-family: "DejaVu Sans", sans-serif; font-size: 10px; line-height: 1.45; }
+        h1 { color: #0d3571; font-size: 21px; margin: 0 0 6px; }
+        h2 { border-bottom: 1px solid #dce4ef; color: #0d3571; font-size: 12px; margin: 20px 0 8px; padding-bottom: 5px; }
         table { border-collapse: collapse; width: 100%; }
-        td { border-bottom: 1px solid #cbd5e1; padding: 6px 0; vertical-align: top; }
+        td { border-bottom: 1px solid #e2e7f0; padding: 6px 0; vertical-align: top; }
         td:first-child { color: #475569; width: 34%; }
-        .badge { background: #1746d1; color: white; display: inline-block; font-size: 8px; padding: 4px 7px; }
+        .badge { background: #164c9c; color: white; display: inline-block; font-size: 8px; padding: 4px 7px; }
         .hash { font-family: "DejaVu Sans Mono", monospace; font-size: 8px; overflow-wrap: anywhere; }
-        .signature { border: 1px solid #0f172a; height: 105px; margin-top: 8px; padding: 10px; text-align: center; }
+        .signature { border: 1px solid #dce4ef; height: 105px; margin-top: 8px; padding: 10px; text-align: center; }
         .signature img { max-height: 85px; max-width: 340px; }
-        .notice { background: #f1f5f9; border-left: 4px solid #1746d1; margin-top: 20px; padding: 10px; }
+        .notice { background: #eef4ff; border-left: 4px solid #164c9c; margin-top: 20px; padding: 10px; }
     </style>
 </head>
 <body>

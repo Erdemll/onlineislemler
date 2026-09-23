@@ -12,7 +12,7 @@
     </header>
 
     <section class="border-2 border-slate-950 bg-white">
-        <div class="hidden grid-cols-[1fr_0.6fr_1fr_1fr_0.7fr_auto] gap-4 border-b-2 border-slate-950 bg-slate-950 px-5 py-3 text-xs font-black uppercase tracking-wider text-white lg:grid">
+        <div class="hidden grid-cols-[1fr_0.6fr_1fr_1fr_0.7fr_auto] gap-4 border-b-2 border-slate-950 bg-slate-950 px-5 py-3 text-xs font-black uppercase tracking-wider text-white xl:grid">
             <span>Müşteri</span>
             <span>Tür</span>
             <span>E-posta</span>
@@ -22,7 +22,7 @@
         </div>
         <div class="divide-y divide-slate-200">
             @forelse ($customers as $customer)
-                <article class="grid gap-4 p-5 lg:grid-cols-[1fr_0.6fr_1fr_1fr_0.7fr_auto] lg:items-center">
+                <article class="grid gap-4 p-5 xl:grid-cols-[1fr_0.6fr_1fr_1fr_0.7fr_auto] xl:items-center">
                     <div class="min-w-0">
                         <p class="text-sm font-bold">{{ $customer->billingTitle() }}</p>
                     </div>

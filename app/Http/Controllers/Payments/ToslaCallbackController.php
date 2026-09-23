@@ -66,7 +66,7 @@ class ToslaCallbackController extends Controller
         $requestStatus = (int) ($data['RequestStatus'] ?? 0);
 
         if ($payment->status === PaymentStatus::Paid || $payment->status === PaymentStatus::Refunded) {
-            return $this->redirectPage();
+            return $this->redirectPage(invoiceUuid: $payment->status === PaymentStatus::Paid ? $payment->invoice?->uuid : null);
         }
 
         if ($mdStatus !== '1' || $bankResponseCode !== '00' || $requestStatus !== 1) {
@@ -107,16 +107,18 @@ class ToslaCallbackController extends Controller
             return $this->redirectPage();
         }
 
-        $completePayment->handle($payment, $inquiry);
+        $completed = $completePayment->handle($payment, $inquiry);
 
-        return $this->redirectPage();
+        return $this->redirectPage(invoiceUuid: $completed ? $payment->invoice?->uuid : null);
     }
 
-    private function redirectPage(bool $verified = true): Response
+    private function redirectPage(bool $verified = true, ?string $invoiceUuid = null): Response
     {
-        $url = route('customer.invoices.index');
+        $url = $invoiceUuid === null
+            ? route('customer.invoices.index')
+            : route('customer.invoices.show', $invoiceUuid);
         $message = $verified
-            ? 'Ödeme sonucunuz alındı. Fatura sayfanıza yönlendiriliyorsunuz.'
+            ? 'Ödeme sonucunuz alındı. Faturanıza yönlendiriliyorsunuz.'
             : 'Ödeme sonucunuz doğrulanamadı. Durumunu kontrol etmek için fatura sayfanıza gidin.';
 
         return response(

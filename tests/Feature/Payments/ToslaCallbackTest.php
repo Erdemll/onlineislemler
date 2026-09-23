@@ -70,6 +70,19 @@ it('rejects a callback with an invalid hash without changing state', function ()
     ]);
 });
 
+it('does not replace the customer session cookie after a cross-site 3D post', function () {
+    $customer = Customer::factory()->ready()->create();
+    $invoice = Invoice::factory()->for($customer)->create(['status' => InvoiceStatus::Unpaid]);
+    $payment = Payment::factory()->for($customer)->for($invoice)->create();
+
+    $response = $this->post(route('payment.callback.akode'), [
+        'OrderId' => $payment->order_id,
+        'Hash' => 'invalid',
+    ]);
+
+    $response->assertStatus(400)->assertHeaderMissing('Set-Cookie');
+});
+
 it('records a failed 3D result without marking the invoice paid', function () {
     $customer = Customer::factory()->ready()->create();
     $invoice = Invoice::factory()->for($customer)->create([
@@ -116,7 +129,9 @@ it('marks the payment and invoice paid and records the Cari Plus collection', fu
 
     $response = $this->post(route('payment.callback.akode'), validCallbackData($payment));
 
-    $response->assertOk();
+    $response->assertOk()
+        ->assertHeaderMissing('Set-Cookie')
+        ->assertSee(route('customer.invoices.show', $invoice->uuid));
     expect($payment->fresh()->status)->toBe(PaymentStatus::Paid)
         ->and($payment->fresh()->paid_at)->not->toBeNull()
         ->and($invoice->fresh()->status)->toBe(InvoiceStatus::Paid)
@@ -185,7 +200,7 @@ it('leaves payment pending when the inquiry amount differs from the payment', fu
         ->and($invoice->fresh()->status)->toBe(InvoiceStatus::Unpaid);
 });
 
-it('accepts a Tosla callback signed with HashParameters and redirects to invoices', function () {
+it('accepts a Tosla callback signed with HashParameters and links to the paid invoice', function () {
     $customer = Customer::factory()->ready()->create();
     $invoice = Invoice::factory()->for($customer)->create([
         'status' => InvoiceStatus::Unpaid,
@@ -216,7 +231,7 @@ it('accepts a Tosla callback signed with HashParameters and redirects to invoice
 
     $response = $this->post(route('payment.callback.akode'), $callback);
 
-    $response->assertOk()->assertSee(route('customer.invoices.index'));
+    $response->assertOk()->assertSee(route('customer.invoices.show', $invoice->uuid));
     expect($gateway->inquired)->toBe([$payment->order_id]);
     expect($cariPlus->createdCollections)->toHaveCount(1);
     $this->assertDatabaseHas('payment_callbacks', ['payment_id' => $payment->id, 'hash_valid' => true]);

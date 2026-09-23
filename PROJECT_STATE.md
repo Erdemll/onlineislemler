@@ -288,6 +288,7 @@ Kararlar:
 - `paid`, `cancelled` ve `refunded` gibi terminal durumlar eski uzak cevaplarla gerilemez.
 - Cari Plus odeme bildirdiginde bagli hizmet talebi `paid` durumuna ilerler.
 - Portal icinde odeme Akode (Tosla) ile alinir (bolum 11); basarili odemede yerel fatura `paid`, bagli hizmet talebi `paid` olur ve Cari Plus'a `bank_transfer` tahsilat kaydi islenir. Cari Plus tarafinda kalan sifirlaninca uzak fatura otomatik `paid` olur.
+- Cari Plus'a bagli faturalar icin musteriye ait `GET /online-islemler/faturalar/{invoice:uuid}` detay ekrani vardir. `GET /v1/sales-invoices/{id}` ile kalemler ve `paid_amount` okunur; uzak fatura ID, cari hesap ID ve para birimi yerel kayitla uyusmazsa uzak bilgiler gosterilmez. Cari Plus ulasilamazsa yerel fatura ozeti gosterilir.
 
 ## 11. Odeme Sistemi (Akode / Tosla)
 
@@ -332,11 +333,11 @@ Hata sinifi: `App\Exceptions\ToslaException`
 4. `App\Http\Controllers\Payments\ToslaCallbackController`: ham veri `payment_callbacks`'a yazilir; `HashParameters` veya eski sabit sirayla hash dogrulanir; `MdStatus`/`BankResponseCode`/`RequestStatus` kontrol edilir; `inquiry` ile OrderId, tutar, para birimi ve durum teyit edilir.
 5. `App\Services\Payments\RecordPaymentSuccess`: kilitli transaction icinde `payments -> paid` (+`paid_at`), `invoices -> paid`, `service_orders -> paid`.
 6. `App\Services\Payments\SyncPaymentCollectionToCariPlus`: Cari Plus `POST /v1/invoice-collections` (`type=bank_transfer`, `amount=odeme snapshot'i`, `company_account_id=config`, idempotency `tahsilat-{payment-uuid}`). Tahsilat tarihi ilk odeme zamanindan sabitlenir; ayni key ile retry govdesi degismez. Donen fatura/tutar/para birimi/tur/hesap esitligi zorunludur. Eksik hesap veya uzak fatura ID'si senkronu basarili isaretlemez; ayar tamamlaninca `payments:reconcile` tekrar dener.
-7. Cevap: musteriyi fatura sayfasina yonlendiren kucuk bir HTML sayfa (Tosla tarayici akisina cevap olarak 200 doner).
+7. Cevap: basarili odemede musteriyi fatura detayina, diger durumlarda fatura listesine yonlendiren kucuk bir HTML sayfa (Tosla tarayici akisina cevap olarak 200 doner).
 
 ### Guvenlik notlari
 
-- `bootstrap/app.php` icinde `validateCsrfTokens(except: ['odeme/callback/akode'])` ile callback route'u CSRF disindadir. **Laravel 13'te CSRF middleware'i `PreventRequestForgery` olarak yeniden adlandirilmistir**; eski `ValidateCsrfToken` adiyla route uzerinde `withoutMiddleware` calismaz (419 hatasi uretir). Bu hataya dusuldu ve `validateCsrfTokens(except)` ile cozuldu.
+- Callback route'u `StartSession`, `ShareErrorsFromSession` ve Laravel 13 `PreventRequestForgery` middleware'lerinden cikarildi. 3D'den gelen cross-site POST isteginde oturum cookie'si gonderilmese bile callback artik bos yeni bir session cookie'si uretmez; musteri sonraki GET isteginde eski oturumuyla devam eder. Eski `ValidateCsrfToken` sinifiyla istisna uygulamak Laravel 13'te calismaz.
 - Callback route'u halka aciktir (auth yok); finansal islem hash + inquiry dogrulamasina dayanir. 16 KB istek boyutu ve IP basina dakikada 300 istek siniri vardir.
 - `ToslaClient` baglanti hatasi, `429` ve gecici `5xx` icin sinirli retry kullanir; `apiPass` hicbir yerde aciga cikmaz.
 
@@ -542,8 +543,8 @@ Canli Akode gecisinde `AKODE_BASE_URL` canli adrese degistirilmeli; test ortamin
 
 Son tam dogrulama:
 
-- Pest: 226 test basarili
-- Assertion: 858
+- Pest: 233 test basarili
+- Assertion: 886
 - Laravel Pint: basarili
 - Vite production build: basarili (bu oturumda)
 - Composer audit: bilinen acik yok (bu oturumda)
@@ -561,6 +562,7 @@ Odeme testleri:
 - `tests/Feature/Payments/ToslaCallbackTest` — gecersiz hash reddi, basarisiz 3D, basarili odeme + Cari Plus tahsilat kaydi, idempotent tekrar, tutar uyusmazligi.
 - `tests/Feature/Console/ReconcilePaymentsTest` — iptal/basarisiz mutabakati, eski siparisin tekil sorgusu, yanlis sorgu bilgisi reddi ve Cari Plus tahsilat retry.
 - `tests/Feature/Services/Tosla/ToslaClientTest` — inquiry yanitinda siparis/tutar/para birimi yapisi.
+- `tests/Feature/Customer/InvoicePageTest` — musterinin kendi Cari Plus satis faturasi detaylarini goruntulemesi, uzak cari hesap sahipligi, ulasilamayan servis ve manuel `collection_status` davranisi.
 
 ## 17. Bilinen Durumlar ve Sonraki Isler
 

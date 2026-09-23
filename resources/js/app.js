@@ -1,34 +1,41 @@
 import SignaturePad from 'signature_pad';
 
-document.querySelectorAll('[data-customer-navigation]').forEach((navigation) => {
-    const activeItem = navigation.querySelector('[data-customer-navigation-active]');
-    const wrapper = navigation.parentElement;
-    const startHint = wrapper.querySelector('[data-customer-navigation-start]');
-    const endHint = wrapper.querySelector('[data-customer-navigation-end]');
+document.querySelectorAll('[data-portal-menu-toggle]').forEach((toggle) => {
+    const menu = document.getElementById(toggle.getAttribute('aria-controls'));
 
-    const updateHints = () => {
-        const maximumScroll = navigation.scrollWidth - navigation.clientWidth;
+    if (!menu) {
+        return;
+    }
 
-        startHint.classList.toggle('opacity-0', navigation.scrollLeft <= 4);
-        endHint.classList.toggle('opacity-0', maximumScroll <= 4 || navigation.scrollLeft >= maximumScroll - 4);
+    const setOpen = (open) => {
+        toggle.setAttribute('aria-expanded', String(open));
+        toggle.setAttribute('aria-label', open ? 'Menüyü kapat' : 'Menüyü aç');
+        menu.classList.toggle('is-open', open);
+        menu.inert = !open && window.matchMedia('(max-width: 1279px)').matches;
     };
 
-    const revealActiveItem = () => {
-        if (!activeItem) {
-            updateHints();
+    setOpen(false);
+    toggle.addEventListener('click', () => {
+        const open = toggle.getAttribute('aria-expanded') !== 'true';
+        setOpen(open);
 
-            return;
+        if (open) {
+            menu.querySelector('.portal-nav-link')?.focus();
         }
-
-        const centeredPosition = activeItem.offsetLeft - ((navigation.clientWidth - activeItem.offsetWidth) / 2);
-        const maximumScroll = navigation.scrollWidth - navigation.clientWidth;
-        navigation.scrollLeft = Math.min(Math.max(centeredPosition, 0), maximumScroll);
-        updateHints();
-    };
-
-    navigation.addEventListener('scroll', updateHints, { passive: true });
-    window.addEventListener('resize', revealActiveItem);
-    requestAnimationFrame(revealActiveItem);
+    });
+    menu.querySelectorAll('a').forEach((link) => link.addEventListener('click', () => setOpen(false)));
+    document.addEventListener('keydown', (event) => {
+        if (event.key === 'Escape' && toggle.getAttribute('aria-expanded') === 'true') {
+            setOpen(false);
+            toggle.focus();
+        }
+    });
+    document.addEventListener('click', (event) => {
+        if (!menu.contains(event.target) && !toggle.contains(event.target)) {
+            setOpen(false);
+        }
+    });
+    window.matchMedia('(min-width: 1280px)').addEventListener('change', () => setOpen(false));
 });
 
 document.querySelectorAll('[data-admin-contract-form]').forEach((form) => {

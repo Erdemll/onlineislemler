@@ -82,6 +82,10 @@
                             <div class="flex flex-wrap items-center gap-2 md:justify-end">
                                 <span class="px-3 py-1 text-xs font-black {{ $statusClass }}">{{ $invoice->status->label() }}</span>
 
+                                @if ($invoice->cari_plus_invoice_id !== null)
+                                    <a href="{{ route('customer.invoices.show', $invoice->uuid) }}" class="border border-slate-950 px-3 py-1 text-xs font-black hover:bg-slate-950 hover:text-white">Faturayı gör</a>
+                                @endif
+
                                 @if (str_starts_with($invoice->idempotency_key, 'portal-') && in_array($invoice->status, [\App\Enums\InvoiceStatus::Draft, \App\Enums\InvoiceStatus::Failed], true))
                                     <form method="POST" action="{{ route('customer.invoices.retry', $invoice->uuid) }}">
                                         @csrf

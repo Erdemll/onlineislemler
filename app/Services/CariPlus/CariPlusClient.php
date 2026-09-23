@@ -56,6 +56,17 @@ class CariPlusClient implements CariPlusGateway
         return $this->dataFrom($response, 200);
     }
 
+    public function getSalesInvoice(int $invoiceId): array
+    {
+        try {
+            $response = $this->sendAuthorized(fn (PendingRequest $request): Response => $request->get("/sales-invoices/{$invoiceId}"));
+        } catch (ConnectionException $exception) {
+            throw new CariPlusException('Cari Plus servisine şu anda ulaşılamıyor.', previous: $exception);
+        }
+
+        return $this->dataFrom($response, 200);
+    }
+
     public function listSalesInvoices(int $currentAccountId, int $page = 1): array
     {
         try {

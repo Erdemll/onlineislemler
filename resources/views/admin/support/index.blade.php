@@ -25,12 +25,12 @@
     </header>
 
     <section class="border-2 border-slate-950 bg-white">
-        <div class="hidden grid-cols-[1fr_0.8fr_0.8fr_auto] gap-4 border-b-2 border-slate-950 bg-slate-950 px-5 py-3 text-xs font-black uppercase tracking-wider text-white lg:grid">
+        <div class="hidden grid-cols-[1fr_0.8fr_0.8fr_auto] gap-4 border-b-2 border-slate-950 bg-slate-950 px-5 py-3 text-xs font-black uppercase tracking-wider text-white xl:grid">
             <span>Talep</span><span>Müşteri</span><span>Durum</span><span>İşlem</span>
         </div>
         <div class="divide-y divide-slate-200">
             @forelse ($tickets as $ticket)
-                <article class="grid gap-4 p-5 lg:grid-cols-[1fr_0.8fr_0.8fr_auto] lg:items-center">
+                <article class="grid gap-4 p-5 xl:grid-cols-[1fr_0.8fr_0.8fr_auto] xl:items-center">
                     <div class="min-w-0">
                         <p class="font-mono text-xs font-black text-[#1746d1]">{{ $ticket->ticket_number }}</p>
                         <h2 class="mt-1 font-black">{{ $ticket->subject }}</h2>
@@ -39,14 +39,14 @@
                         @endif
                     </div>
                     <div>
-                        <p class="text-xs font-black uppercase tracking-wide text-slate-500 lg:hidden">Müşteri</p>
+                        <p class="text-xs font-black uppercase tracking-wide text-slate-500 xl:hidden">Müşteri</p>
                         <p class="text-sm font-bold">{{ $ticket->customer->billingTitle() }}</p>
                         <p class="mt-1 break-all text-xs text-slate-500">{{ $ticket->customer->email }}</p>
                     </div>
                     <div>
-                        <p class="text-xs font-black uppercase tracking-wide text-slate-500 lg:hidden">Durum</p>
+                        <p class="text-xs font-black uppercase tracking-wide text-slate-500 xl:hidden">Durum</p>
                         <span @class([
-                            'mt-1 inline-flex px-2.5 py-1 text-xs font-black lg:mt-0',
+                            'mt-1 inline-flex px-2.5 py-1 text-xs font-black xl:mt-0',
                             'bg-amber-100 text-amber-950' => $ticket->status === \App\Enums\SupportTicketStatus::AwaitingSupport,
                             'bg-blue-100 text-blue-950' => $ticket->status === \App\Enums\SupportTicketStatus::AwaitingCustomer,
                             'bg-slate-200 text-slate-700' => $ticket->status === \App\Enums\SupportTicketStatus::Closed,

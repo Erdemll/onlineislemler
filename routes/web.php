@@ -32,7 +32,10 @@ use App\Http\Controllers\Customer\ServicePurchaseController;
 use App\Http\Controllers\Customer\SupportReplyController;
 use App\Http\Controllers\Customer\SupportTicketController;
 use App\Http\Controllers\Payments\ToslaCallbackController;
+use Illuminate\Foundation\Http\Middleware\PreventRequestForgery;
+use Illuminate\Session\Middleware\StartSession;
 use Illuminate\Support\Facades\Route;
+use Illuminate\View\Middleware\ShareErrorsFromSession;
 
 Route::get('/', function () {
     return redirect()->route('customer.dashboard');
@@ -244,6 +247,9 @@ Route::middleware([
         [InvoiceController::class, 'index']
     )->name('customer.invoices.index');
 
+    Route::get('/online-islemler/faturalar/{invoice:uuid}', [InvoiceController::class, 'show'])
+        ->name('customer.invoices.show');
+
     Route::post(
         '/online-islemler/faturalar/esitle',
         InvoiceSyncController::class
@@ -419,5 +425,10 @@ Route::middleware([
 });
 
 Route::post('/odeme/callback/akode', ToslaCallbackController::class)
+    ->withoutMiddleware([
+        StartSession::class,
+        ShareErrorsFromSession::class,
+        PreventRequestForgery::class,
+    ])
     ->middleware('throttle:payment-callback')
     ->name('payment.callback.akode');

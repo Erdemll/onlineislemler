@@ -5,13 +5,14 @@
 @section('content')
     <header class="grid gap-4 border-b-2 border-slate-950 pb-7 md:grid-cols-[1fr_auto] md:items-end">
         <div>
-            <p class="text-xs font-black uppercase tracking-[0.2em] text-[#1746d1]">Yönetim / 01</p>
+            <p class="text-xs font-black uppercase tracking-[0.2em] text-[#1746d1]">Yönetim merkezi</p>
             <h1 class="mt-3 text-4xl font-black tracking-[-0.055em] sm:text-6xl">Genel bakış</h1>
+            <p class="mt-3 text-sm text-slate-600">Sözleşme, ürün ve destek süreçlerinin güncel durumu.</p>
         </div>
         <a class="inline-flex min-h-12 items-center justify-center bg-slate-950 px-5 text-sm font-black text-white hover:bg-[#1746d1]" href="{{ route('admin.contracts.create') }}">Yeni sözleşme sürümü</a>
     </header>
 
-    <section class="grid gap-4 sm:grid-cols-2 xl:grid-cols-5" aria-label="Yönetim özeti">
+    <section class="grid gap-4 sm:grid-cols-2 xl:grid-cols-3" aria-label="Yönetim özeti">
         @foreach ([
             ['label' => 'Sözleşme', 'value' => $contractCount],
             ['label' => 'Yayımlanan sürüm', 'value' => $versionCount],
@@ -19,7 +20,7 @@
             ['label' => 'Cari Plus ürünü', 'value' => $productCount],
             ['label' => 'Yanıt bekleyen destek', 'value' => $supportTicketCount],
         ] as $item)
-            <article class="border-2 border-slate-950 bg-white p-5">
+            <article class="portal-stat-card border-2 border-slate-950 bg-white p-5">
                 <p class="text-xs font-black uppercase tracking-wider text-slate-500">{{ $item['label'] }}</p>
                 <p class="mt-5 text-4xl font-black tracking-[-0.06em]">{{ $item['value'] }}</p>
             </article>

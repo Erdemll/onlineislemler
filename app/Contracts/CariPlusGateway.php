@@ -19,6 +19,9 @@ interface CariPlusGateway
     /** @return array<string, mixed> */
     public function issueSalesInvoice(int $invoiceId, string $idempotencyKey): array;
 
+    /** @return array<string, mixed> */
+    public function getSalesInvoice(int $invoiceId): array;
+
     /** @return array{data: list<array<string, mixed>>, meta: array<string, mixed>} */
     public function listSalesInvoices(int $currentAccountId, int $page = 1): array;
 

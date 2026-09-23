@@ -130,9 +130,7 @@ class SyncCustomerInvoices
             'cancelled' => InvoiceStatus::Cancelled,
             'partial_refund' => InvoiceStatus::PartialRefund,
             'refunded' => InvoiceStatus::Refunded,
-            'issued' => ($remote['collection_status'] ?? null) === 'collected'
-                ? InvoiceStatus::Paid
-                : InvoiceStatus::Unpaid,
+            'issued' => InvoiceStatus::Unpaid,
             default => throw new CariPlusException('Cari Plus bilinmeyen bir fatura durumu döndürdü.'),
         };
 

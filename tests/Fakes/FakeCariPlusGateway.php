@@ -27,6 +27,14 @@ class FakeCariPlusGateway implements CariPlusGateway
     /** @var list<array<string, mixed>> */
     public array $remoteInvoices = [];
 
+    /** @var array<string, mixed>|null */
+    public ?array $salesInvoiceDetail = null;
+
+    /** @var list<int> */
+    public array $requestedSalesInvoices = [];
+
+    public ?CariPlusException $salesInvoiceDetailException = null;
+
     public bool $configured = true;
 
     public ?CariPlusException $createException = null;
@@ -150,6 +158,18 @@ class FakeCariPlusGateway implements CariPlusGateway
             'due_date' => now()->addDays(14)->toDateString(),
             'collection_status' => 'to_collect',
         ];
+    }
+
+    public function getSalesInvoice(int $invoiceId): array
+    {
+        $this->requestedSalesInvoices[] = $invoiceId;
+
+        if ($this->salesInvoiceDetailException !== null) {
+            throw $this->salesInvoiceDetailException;
+        }
+
+        return $this->salesInvoiceDetail
+            ?? throw new CariPlusException('Cari Plus faturası bulunamadı.');
     }
 
     /** @param array<string, mixed> $payload
