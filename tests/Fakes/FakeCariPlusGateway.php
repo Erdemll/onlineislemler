@@ -39,6 +39,18 @@ class FakeCariPlusGateway implements CariPlusGateway
 
     public ?int $currentAccountId = 55;
 
+    /** @var array<string, mixed> */
+    public array $salesInvoiceResponse = [
+        'id' => 902,
+        'invoice_number' => 'FTR-2026-0043',
+        'status' => 'draft',
+        'currency' => 'TRY',
+        'collection_status' => 'to_collect',
+    ];
+
+    /** @var array<string, mixed>|null */
+    public ?array $issuedInvoiceResponse = null;
+
     /** @var list<string> */
     public array $resolvedCodes = [];
 
@@ -49,6 +61,24 @@ class FakeCariPlusGateway implements CariPlusGateway
 
     /** @var list<array{payload: array<string, mixed>, idempotency_key: string}> */
     public array $createdProducts = [];
+
+    /** @var list<array{payload: array<string, mixed>, idempotency_key: string}> */
+    public array $createdCollections = [];
+
+    /** @var list<array<string, mixed>> */
+    public array $companyAccounts = [
+        ['id' => 1, 'name' => 'Merkez Kasa', 'type' => 'cash', 'currency' => 'TRY', 'is_active' => true],
+        ['id' => 2, 'name' => 'Ziraat TL', 'type' => 'bank', 'currency' => 'TRY', 'is_active' => true],
+    ];
+
+    /** @var array<string, mixed> */
+    public array $collectionResponse = [
+        'id' => 4001,
+        'type' => 'bank_transfer',
+        'currency' => 'TRY',
+    ];
+
+    public ?CariPlusException $collectionException = null;
 
     /** @var list<array<string, mixed>> */
     public array $remoteProducts = [];
@@ -84,17 +114,13 @@ class FakeCariPlusGateway implements CariPlusGateway
             'idempotency_key' => $idempotencyKey,
         ];
 
+        $financials = $this->invoiceFinancials($payload);
+
         return [
-            'id' => 902,
-            'invoice_number' => 'FTR-2026-0043',
-            'status' => 'draft',
-            'currency' => 'TRY',
-            'subtotal' => 749.92,
-            'tax_amount' => 149.98,
-            'total' => 899.90,
+            ...$financials,
+            ...$this->salesInvoiceResponse,
             'invoice_date' => now()->toDateString(),
             'due_date' => now()->addDays(14)->toDateString(),
-            'collection_status' => 'to_collect',
         ];
     }
 
@@ -109,17 +135,37 @@ class FakeCariPlusGateway implements CariPlusGateway
             'idempotency_key' => $idempotencyKey,
         ];
 
-        return [
+        $lastCreated = end($this->created);
+        $financials = is_array($lastCreated)
+            ? $this->invoiceFinancials($lastCreated['payload'])
+            : ['subtotal' => 749.92, 'tax_amount' => 149.98, 'total' => 899.90];
+
+        return $this->issuedInvoiceResponse ?? [
             'id' => $invoiceId,
             'invoice_number' => 'FTR-2026-0043',
             'status' => 'issued',
             'currency' => 'TRY',
-            'subtotal' => 749.92,
-            'tax_amount' => 149.98,
-            'total' => 899.90,
+            ...$financials,
             'invoice_date' => now()->toDateString(),
             'due_date' => now()->addDays(14)->toDateString(),
             'collection_status' => 'to_collect',
+        ];
+    }
+
+    /** @param array<string, mixed> $payload
+     * @return array{subtotal: float, tax_amount: float, total: float}
+     */
+    private function invoiceFinancials(array $payload): array
+    {
+        $item = $payload['items'][0];
+        $gross = (float) $item['unit_price'] * (float) $item['quantity'];
+        $taxRate = (float) ($item['tax_rate'] ?? 0);
+        $subtotal = round($gross / (1 + $taxRate / 100), 2);
+
+        return [
+            'subtotal' => $subtotal,
+            'tax_amount' => round($gross - $subtotal, 2),
+            'total' => round($gross, 2),
         ];
     }
 
@@ -176,6 +222,30 @@ class FakeCariPlusGateway implements CariPlusGateway
         return [
             'id' => 30112,
             ...$payload,
+        ];
+    }
+
+    public function listCompanyAccounts(): array
+    {
+        return $this->companyAccounts;
+    }
+
+    public function createInvoiceCollection(array $payload, string $idempotencyKey): array
+    {
+        if ($this->collectionException !== null) {
+            throw $this->collectionException;
+        }
+
+        $this->createdCollections[] = [
+            'payload' => $payload,
+            'idempotency_key' => $idempotencyKey,
+        ];
+
+        return [
+            'sales_invoice_id' => $payload['sales_invoice_id'],
+            'amount' => $payload['amount'],
+            'company_account_id' => $payload['company_account_id'],
+            ...$this->collectionResponse,
         ];
     }
 

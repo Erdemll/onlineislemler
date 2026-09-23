@@ -1,6 +1,7 @@
 <?php
 
 use App\Contracts\CariPlusGateway;
+use App\Enums\InvoiceStatus;
 use App\Enums\ServiceOrderStatus;
 use App\Exceptions\CariPlusException;
 use App\Mail\ContractSigningCodeMail;
@@ -10,6 +11,7 @@ use App\Models\Customer;
 use App\Models\Invoice;
 use App\Models\Service;
 use App\Models\ServiceOrder;
+use App\Services\Contracts\EncryptedContractDocumentStorage;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 use Illuminate\Support\Facades\Mail;
 use Illuminate\Support\Facades\Storage;
@@ -110,7 +112,7 @@ it('creates an immutable acceptance PDF before issuing the invoice', function ()
         ->and($invoice->service_order_id)->toBe($order->id)
         ->and($this->gateway->created)->toHaveCount(1);
     Storage::disk('local')->assertExists($acceptance->document_path);
-    expect(hash('sha256', Storage::disk('local')->get($acceptance->document_path)))
+    expect(hash('sha256', app(EncryptedContractDocumentStorage::class)->get($acceptance->document_path)))
         ->toBe($acceptance->signed_document_hash);
 
     $events = $order->events()->orderBy('sequence')->get();
@@ -158,6 +160,64 @@ it('rejects an invalid OTP without accepting the contract or creating an invoice
     expect($this->gateway->created)->toBeEmpty();
 });
 
+it('rejects an expired challenge even when it was previously verified', function () {
+    $customer = Customer::factory()->ready()->create();
+    $service = serviceWithRequiredContract();
+    $this->actingAsCustomer($customer)->post(route('customer.services.purchase', $service));
+    $order = ServiceOrder::query()->firstOrFail();
+    $this->actingAsCustomer($customer)->post(route('customer.service-orders.contract.challenge', $order), [
+        'accepted' => '1',
+        'signature_data' => contractSignatureData(),
+    ]);
+    $challenge = $order->signingChallenges()->firstOrFail();
+    $challenge->forceFill([
+        'verified_at' => now()->subMinutes(11),
+        'expires_at' => now()->subMinute(),
+    ])->save();
+
+    $response = $this->actingAsCustomer($customer)
+        ->post(route('customer.service-orders.contract.accept', $order), [
+            'challenge_uuid' => $challenge->uuid,
+            'code' => '123456',
+        ]);
+
+    $response->assertSessionHasErrors('code');
+    $this->assertDatabaseCount('contract_acceptances', 0);
+    $this->assertDatabaseCount('invoices', 0);
+});
+
+it('rejects a contract OTP from a different session', function () {
+    $customer = Customer::factory()->ready()->create();
+    $service = serviceWithRequiredContract();
+    $this->actingAsCustomer($customer)->post(route('customer.services.purchase', $service));
+    $order = ServiceOrder::query()->firstOrFail();
+    $this->actingAsCustomer($customer)->post(route('customer.service-orders.contract.challenge', $order), [
+        'accepted' => '1',
+        'signature_data' => contractSignatureData(),
+    ]);
+    $challenge = $order->signingChallenges()->firstOrFail();
+    $challenge->forceFill([
+        'session_identifier_hash' => hash('sha256', 'another-session'),
+    ])->save();
+    $code = null;
+    Mail::assertSent(ContractSigningCodeMail::class, function (ContractSigningCodeMail $mail) use (&$code): bool {
+        $code = $mail->code;
+
+        return true;
+    });
+
+    $response = $this->actingAsCustomer($customer)
+        ->post(route('customer.service-orders.contract.accept', $order), [
+            'challenge_uuid' => $challenge->uuid,
+            'code' => $code,
+        ]);
+
+    $response->assertSessionHasErrors('code');
+    expect($challenge->fresh()->consumed_at)->not->toBeNull();
+    $this->assertDatabaseCount('contract_acceptances', 0);
+    expect($this->gateway->created)->toBeEmpty();
+});
+
 it('preserves the signed acceptance when Cari Plus invoice creation fails', function () {
     $customer = Customer::factory()->ready()->create();
     $service = serviceWithRequiredContract();
@@ -194,6 +254,73 @@ it('preserves the signed acceptance when Cari Plus invoice creation fails', func
     ]);
     Storage::disk('local')->assertExists($acceptance->document_path);
     expect($order->events()->where('event_type', 'invoice_creation_failed')->exists())->toBeTrue();
+});
+
+it('does not issue a terminal invoice again when an accepted contract is submitted twice', function () {
+    $customer = Customer::factory()->ready()->create();
+    $service = serviceWithRequiredContract();
+    $this->actingAsCustomer($customer)->post(route('customer.services.purchase', $service));
+    $order = ServiceOrder::query()->firstOrFail();
+    $this->actingAsCustomer($customer)->post(route('customer.service-orders.contract.challenge', $order), [
+        'accepted' => '1',
+        'signature_data' => contractSignatureData(),
+    ]);
+    $challenge = $order->signingChallenges()->firstOrFail();
+    $code = null;
+    Mail::assertSent(ContractSigningCodeMail::class, function (ContractSigningCodeMail $mail) use (&$code): bool {
+        $code = $mail->code;
+
+        return true;
+    });
+    $this->actingAsCustomer($customer)->post(route('customer.service-orders.contract.accept', $order), [
+        'challenge_uuid' => $challenge->uuid,
+        'code' => $code,
+    ]);
+    $invoice = Invoice::query()->firstOrFail();
+    $invoice->update(['status' => InvoiceStatus::Paid]);
+
+    $response = $this->actingAsCustomer($customer)
+        ->post(route('customer.service-orders.contract.accept', $order), [
+            'challenge_uuid' => '8ac76fb2-1441-4ec0-97f4-08c7a3816af5',
+            'code' => '000000',
+        ]);
+
+    $response->assertRedirect(route('customer.invoices.index'));
+    expect($invoice->fresh()->status)->toBe(InvoiceStatus::Paid)
+        ->and($this->gateway->issued)->toHaveCount(1);
+    expect($order->events()->where('event_type', 'invoice_created')->count())->toBe(1);
+});
+
+it('keeps an acceptance retryable when Cari Plus returns a malformed invoice', function () {
+    $customer = Customer::factory()->ready()->create();
+    $service = serviceWithRequiredContract();
+    $this->gateway->salesInvoiceResponse = [];
+    $this->actingAsCustomer($customer)->post(route('customer.services.purchase', $service));
+    $order = ServiceOrder::query()->firstOrFail();
+    $this->actingAsCustomer($customer)->post(route('customer.service-orders.contract.challenge', $order), [
+        'accepted' => '1',
+        'signature_data' => contractSignatureData(),
+    ]);
+    $challenge = $order->signingChallenges()->firstOrFail();
+    $code = null;
+    Mail::assertSent(ContractSigningCodeMail::class, function (ContractSigningCodeMail $mail) use (&$code): bool {
+        $code = $mail->code;
+
+        return true;
+    });
+
+    $response = $this->actingAsCustomer($customer)
+        ->post(route('customer.service-orders.contract.accept', $order), [
+            'challenge_uuid' => $challenge->uuid,
+            'code' => $code,
+        ]);
+
+    $response->assertRedirect(route('customer.contracts.index'));
+    $this->assertDatabaseHas('invoices', [
+        'service_order_id' => $order->id,
+        'status' => InvoiceStatus::Failed->value,
+    ]);
+    expect($order->fresh()->status)->toBe(ServiceOrderStatus::InvoiceFailed);
 });
 
 it('requires corporate signers to confirm their authority', function () {

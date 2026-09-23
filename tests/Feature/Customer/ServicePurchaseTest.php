@@ -75,6 +75,70 @@ it('keeps a failed local record when Cari Plus cannot create the draft', functio
     ]);
 });
 
+it('keeps the draft retryable when Cari Plus issues a different invoice', function () {
+    $customer = Customer::factory()->ready()->create([
+        'cari_plus_current_account_id' => 55,
+    ]);
+    $service = Service::factory()->create([
+        'cari_plus_product_id' => 30112,
+    ]);
+    $gateway = new FakeCariPlusGateway;
+    $gateway->issuedInvoiceResponse = [
+        'id' => 999,
+        'status' => 'issued',
+    ];
+    $this->app->instance(CariPlusGateway::class, $gateway);
+
+    $call = fn () => app(CreateServiceInvoice::class)->create($customer, $service);
+
+    expect($call)->toThrow(CariPlusException::class, 'Cari Plus beklenmeyen bir fatura kimliği döndürdü.');
+    $this->assertDatabaseHas('invoices', [
+        'customer_id' => $customer->id,
+        'cari_plus_invoice_id' => 902,
+        'status' => InvoiceStatus::Draft->value,
+    ]);
+});
+
+it('does not issue a draft whose amount, currency or state differs from the purchase', function (array $changes) {
+    $customer = Customer::factory()->ready()->create(['cari_plus_current_account_id' => 55]);
+    $service = Service::factory()->create(['cari_plus_product_id' => 30112, 'price' => 899.90]);
+    $gateway = new FakeCariPlusGateway;
+    $gateway->salesInvoiceResponse = [...$gateway->salesInvoiceResponse, ...$changes];
+    $this->app->instance(CariPlusGateway::class, $gateway);
+
+    expect(fn () => app(CreateServiceInvoice::class)->create($customer, $service))
+        ->toThrow(CariPlusException::class, 'Cari Plus faturası sözleşmedeki tutar, para birimi veya durumla eşleşmiyor.');
+
+    expect($gateway->issued)->toBeEmpty();
+    $this->assertDatabaseHas('invoices', ['customer_id' => $customer->id, 'status' => InvoiceStatus::Failed->value]);
+})->with([
+    'wrong total' => [['total' => 100]],
+    'wrong currency' => [['currency' => 'USD']],
+    'premature status' => [['status' => 'issued']],
+]);
+
+it('does not offer payment when the issued invoice no longer matches the draft', function () {
+    $customer = Customer::factory()->ready()->create(['cari_plus_current_account_id' => 55]);
+    $service = Service::factory()->create(['cari_plus_product_id' => 30112, 'price' => 899.90]);
+    $gateway = new FakeCariPlusGateway;
+    $gateway->issuedInvoiceResponse = [
+        'id' => 902,
+        'status' => 'issued',
+        'currency' => 'TRY',
+        'total' => 999.90,
+    ];
+    $this->app->instance(CariPlusGateway::class, $gateway);
+
+    expect(fn () => app(CreateServiceInvoice::class)->create($customer, $service))
+        ->toThrow(CariPlusException::class, 'Cari Plus faturası sözleşmedeki tutar, para birimi veya durumla eşleşmiyor.');
+
+    $this->assertDatabaseHas('invoices', [
+        'customer_id' => $customer->id,
+        'cari_plus_invoice_id' => 902,
+        'status' => InvoiceStatus::Draft->value,
+    ]);
+});
+
 it('does not create a local invoice for a service without a Cari Plus product match', function () {
     $customer = Customer::factory()->ready()->create([
         'cari_plus_current_account_id' => 55,

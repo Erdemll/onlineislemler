@@ -8,6 +8,7 @@ use App\Http\Requests\Customer\StartContractSigningRequest;
 use App\Models\ServiceOrder;
 use App\Services\Contracts\StartContractSigning;
 use Illuminate\Http\RedirectResponse;
+use Illuminate\Support\Str;
 
 class ContractSigningChallengeController extends Controller
 {
@@ -20,6 +21,8 @@ class ContractSigningChallengeController extends Controller
         StartContractSigning $startSigning,
     ): RedirectResponse {
         abort_unless($serviceOrder->customer_id === $request->user('customer')->id, 404);
+        $sessionIdentifier = Str::random(64);
+        $request->session()->put('contract_signing_session_identifier', $sessionIdentifier);
 
         try {
             $challenge = $startSigning->start(
@@ -28,7 +31,7 @@ class ContractSigningChallengeController extends Controller
                 signatureData: $request->validated('signature_data'),
                 ipAddress: $request->ip(),
                 userAgent: $request->userAgent(),
-                sessionIdentifier: $request->session()->getId(),
+                sessionIdentifier: $sessionIdentifier,
             );
         } catch (ContractSigningException $exception) {
             report($exception);

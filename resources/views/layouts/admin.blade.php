@@ -35,6 +35,7 @@
                         ['route' => 'admin.contracts.index', 'pattern' => 'admin.contracts.*', 'label' => 'Sözleşmeler', 'no' => '02'],
                         ['route' => 'admin.contract-acceptances.index', 'pattern' => 'admin.contract-acceptances.*', 'label' => 'İmzalananlar', 'no' => '03'],
                         ['route' => 'admin.support.index', 'pattern' => 'admin.support.*', 'label' => 'Destek', 'no' => '04'],
+                        ['route' => 'admin.customers.index', 'pattern' => 'admin.customers.*', 'label' => 'Müşteriler', 'no' => '05'],
                     ] as $item)
                         <a
                             href="{{ route($item['route']) }}"

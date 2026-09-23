@@ -4,6 +4,7 @@ namespace Database\Factories;
 
 use App\Models\Contract;
 use App\Models\ContractVersion;
+use App\Services\Contracts\EncryptedContractDocumentStorage;
 use Illuminate\Database\Eloquent\Factories\Factory;
 use Illuminate\Support\Facades\Storage;
 use Illuminate\Support\Str;
@@ -17,7 +18,8 @@ class ContractVersionFactory extends Factory
     {
         return $this->afterCreating(function (ContractVersion $version): void {
             if (! Storage::disk('local')->exists($version->source_document_path)) {
-                Storage::disk('local')->put($version->source_document_path, $this->sourceBytes());
+                app(EncryptedContractDocumentStorage::class)
+                    ->put($version->source_document_path, $this->sourceBytes());
             }
         });
     }

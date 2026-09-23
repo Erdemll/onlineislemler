@@ -6,6 +6,7 @@ use App\Contracts\CariPlusGateway;
 use App\Enums\CustomerType;
 use App\Exceptions\CariPlusException;
 use App\Models\Customer;
+use Illuminate\Database\QueryException;
 
 class ProvisionCurrentAccount
 {
@@ -25,7 +26,7 @@ class ProvisionCurrentAccount
             $existingId = $this->gateway->findCurrentAccountIdByCode($customer->cari_plus_current_account_code);
 
             if ($existingId !== null) {
-                $customer->forceFill(['cari_plus_current_account_id' => $existingId])->save();
+                $this->assign($customer, $existingId);
 
                 return $existingId;
             }
@@ -43,10 +44,7 @@ class ProvisionCurrentAccount
         }
 
         $code = $response['code'] ?? null;
-        $customer->forceFill([
-            'cari_plus_current_account_id' => $id,
-            'cari_plus_current_account_code' => is_string($code) && $code !== '' ? $code : null,
-        ])->save();
+        $this->assign($customer, $id, is_string($code) && $code !== '' ? $code : null);
 
         return $id;
     }
@@ -99,6 +97,25 @@ class ProvisionCurrentAccount
 
         if (collect($required)->contains(fn (mixed $value): bool => blank($value))) {
             throw new CariPlusException('Cari Plus müşteri hesabı için kayıt bilgileri eksik.');
+        }
+    }
+
+    private function assign(Customer $customer, int $id, ?string $code = null): void
+    {
+        if (Customer::query()
+            ->where('cari_plus_current_account_id', $id)
+            ->whereKeyNot($customer->id)
+            ->exists()) {
+            throw new CariPlusException('Cari Plus cari hesabı başka bir müşteriye bağlı.');
+        }
+
+        try {
+            $customer->forceFill([
+                'cari_plus_current_account_id' => $id,
+                'cari_plus_current_account_code' => $code ?? $customer->cari_plus_current_account_code,
+            ])->save();
+        } catch (QueryException $exception) {
+            throw new CariPlusException('Cari Plus cari hesabı başka bir müşteriye bağlı.', previous: $exception);
         }
     }
 }

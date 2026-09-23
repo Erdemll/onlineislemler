@@ -38,6 +38,9 @@ class ContractAcceptanceController extends Controller
                 order: $serviceOrder,
                 challengeUuid: $request->validated('challenge_uuid'),
                 code: $request->validated('code'),
+                ipAddress: $request->ip(),
+                userAgent: $request->userAgent(),
+                sessionIdentifier: (string) $request->session()->get('contract_signing_session_identifier'),
             );
         } catch (ContractSigningException $exception) {
             return redirect()

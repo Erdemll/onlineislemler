@@ -16,6 +16,9 @@ return Application::configure(basePath: dirname(__DIR__))
         health: '/up',
     )
     ->withMiddleware(function (Middleware $middleware): void {
+        $middleware->validateCsrfTokens(except: [
+            'odeme/callback/akode',
+        ]);
         $middleware->alias([
             'customer.cari_plus.ready' => EnsureCustomerCariPlusAccountIsReady::class,
             'customer.email.verified' => EnsureCustomerEmailIsVerified::class,
@@ -30,6 +33,13 @@ return Application::configure(basePath: dirname(__DIR__))
         );
     })
     ->withExceptions(function (Exceptions $exceptions): void {
+        $exceptions->dontFlash([
+            'national_id',
+            'tax_number',
+            'spending_unit_tax_number',
+            'signature_data',
+            'code',
+        ]);
         $exceptions->shouldRenderJsonWhen(
             fn (Request $request) => $request->is('api/*') || $request->expectsJson(),
         );

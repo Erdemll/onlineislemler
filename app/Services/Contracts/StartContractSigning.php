@@ -9,15 +9,20 @@ use App\Models\ContractSigningChallenge;
 use App\Models\Customer;
 use App\Models\ServiceOrder;
 use Illuminate\Support\Facades\Crypt;
+use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Hash;
 use Illuminate\Support\Facades\Mail;
 use Illuminate\Support\Facades\Storage;
 use Illuminate\Support\Str;
+use RuntimeException;
 use Throwable;
 
 class StartContractSigning
 {
-    public function __construct(private RecordContractAuditEvent $audit) {}
+    public function __construct(
+        private RecordContractAuditEvent $audit,
+        private EncryptedContractDocumentStorage $documents,
+    ) {}
 
     public function start(
         Customer $customer,
@@ -29,7 +34,11 @@ class StartContractSigning
     ): ContractSigningChallenge {
         $order->loadMissing('contractVersion.contract');
         $this->ensureOrderCanBeSigned($customer, $order);
-        $documentBytes = Storage::disk('local')->get($order->contractVersion->source_document_path);
+        try {
+            $documentBytes = $this->documents->get($order->contractVersion->source_document_path);
+        } catch (RuntimeException $exception) {
+            throw new ContractSigningException('Sözleşme dosyasının bütünlüğü doğrulanamadı.', previous: $exception);
+        }
 
         if (! hash_equals($order->contractVersion->source_document_hash, hash('sha256', $documentBytes))) {
             throw new ContractSigningException('Sözleşme dosyasının bütünlüğü doğrulanamadı.');
@@ -44,9 +53,6 @@ class StartContractSigning
         }
 
         $code = (string) random_int(100000, 999999);
-        $previousChallenges = $order->signingChallenges()->whereNull('consumed_at')->get();
-        $order->signingChallenges()->whereNull('consumed_at')->update(['consumed_at' => now()]);
-        Storage::disk('local')->delete($previousChallenges->pluck('signature_path')->all());
         $challenge = ContractSigningChallenge::query()->create([
             'uuid' => $challengeUuid,
             'service_order_id' => $order->id,
@@ -61,6 +67,7 @@ class StartContractSigning
             'user_agent' => $userAgent,
             'session_identifier_hash' => hash('sha256', $sessionIdentifier),
             'expires_at' => now()->addMinutes(10),
+            'consumed_at' => now(),
         ]);
 
         try {
@@ -70,7 +77,6 @@ class StartContractSigning
                 serviceName: $order->service_name_snapshot,
             ));
         } catch (Throwable $exception) {
-            $challenge->update(['consumed_at' => now()]);
             Storage::disk('local')->delete($challenge->signature_path);
             $this->audit->record($order, 'otp_delivery_failed', [
                 'challenge_uuid' => $challenge->uuid,
@@ -80,7 +86,30 @@ class StartContractSigning
             throw new ContractSigningException('Sözleşme onay kodu gönderilemedi. Lütfen tekrar deneyin.', previous: $exception);
         }
 
-        $order->update(['status' => ServiceOrderStatus::OtpPending, 'last_error' => null]);
+        try {
+            $previousChallenges = DB::transaction(function () use ($customer, $order, $challenge): mixed {
+                $lockedOrder = ServiceOrder::query()->lockForUpdate()->findOrFail($order->id);
+                $this->ensureOrderCanBeSigned($customer, $lockedOrder);
+                $previous = $lockedOrder->signingChallenges()
+                    ->whereKeyNot($challenge->id)
+                    ->whereNull('consumed_at')
+                    ->get();
+                $lockedOrder->signingChallenges()
+                    ->whereKeyNot($challenge->id)
+                    ->whereNull('consumed_at')
+                    ->update(['consumed_at' => now()]);
+                $challenge->update(['consumed_at' => null]);
+                $lockedOrder->update(['status' => ServiceOrderStatus::OtpPending, 'last_error' => null]);
+
+                return $previous;
+            });
+        } catch (Throwable $exception) {
+            Storage::disk('local')->delete($challenge->signature_path);
+
+            throw new ContractSigningException('Sözleşme onay süreci başlatılamadı. Lütfen tekrar deneyin.', previous: $exception);
+        }
+
+        Storage::disk('local')->delete($previousChallenges->pluck('signature_path')->all());
         $this->audit->record($order, 'otp_sent', [
             'challenge_uuid' => $challenge->uuid,
             'delivery_channel' => 'email',

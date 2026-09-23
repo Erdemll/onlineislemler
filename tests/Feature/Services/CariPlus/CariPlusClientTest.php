@@ -5,9 +5,22 @@ use App\Services\CariPlus\CariPlusClient;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 use Illuminate\Http\Client\Request;
 use Illuminate\Support\Facades\Cache;
+use Illuminate\Support\Facades\Crypt;
 use Illuminate\Support\Facades\Http;
 
 uses(RefreshDatabase::class);
+
+function cacheCariPlusToken(string $token): string
+{
+    $key = 'cari_plus.access_token.encrypted.'.hash('sha256', implode('|', [
+        (string) config('services.cari_plus.base_url'),
+        (string) config('services.cari_plus.client_id'),
+    ]));
+
+    Cache::put($key, Crypt::encryptString($token), now()->addMinutes(10));
+
+    return $key;
+}
 
 beforeEach(function () {
     config()->set('services.cari_plus', [
@@ -18,12 +31,12 @@ beforeEach(function () {
         'timeout' => 10,
     ]);
 
-    Cache::forget('cari_plus.access_token');
+    Cache::clear();
     Http::preventStrayRequests();
 });
 
 it('creates an idempotent current account', function () {
-    Cache::put('cari_plus.access_token', 'cached-token', now()->addMinutes(10));
+    cacheCariPlusToken('cached-token');
     Http::fake([
         'api.cariplus.test/v1/current-accounts' => Http::response([
             'data' => ['id' => 701, 'code' => 'MUS000701'],
@@ -87,7 +100,7 @@ it('authenticates and sends an idempotent sales invoice request', function () {
 });
 
 it('uses the cached access token for following requests', function () {
-    Cache::put('cari_plus.access_token', 'cached-token', now()->addMinutes(10));
+    $cacheKey = cacheCariPlusToken('cached-token');
     Http::fake([
         'api.cariplus.test/v1/sales-invoices/902/issue' => Http::response([
             'data' => ['id' => 902, 'status' => 'issued'],
@@ -97,14 +110,36 @@ it('uses the cached access token for following requests', function () {
     $result = (new CariPlusClient)->issueSalesInvoice(902, 'portal-test-1-issue');
 
     expect($result['status'])->toBe('issued');
+    expect(Cache::get($cacheKey))->not->toBe('cached-token');
     Http::assertSentCount(1);
     Http::assertSent(fn (Request $request): bool => $request->hasHeader('Authorization', 'Bearer cached-token')
         && $request->hasHeader('Idempotency-Key', 'portal-test-1-issue')
     );
 });
 
+it('refreshes an expired access token once after a 401 response', function () {
+    cacheCariPlusToken('expired-token');
+    Http::fake([
+        'api.cariplus.test/v1/auth/token' => Http::response([
+            'data' => [
+                'access_token' => 'fresh-token',
+                'expires_in' => 3600,
+            ],
+        ]),
+        'api.cariplus.test/v1/products*' => Http::sequence()
+            ->push(['error' => ['code' => 'unauthorized']], 401)
+            ->push(['data' => [], 'meta' => ['total_pages' => 1]], 200),
+    ]);
+
+    $result = (new CariPlusClient)->listProducts();
+
+    expect($result['data'])->toBe([]);
+    Http::assertSent(fn (Request $request): bool => $request->url() === 'https://api.cariplus.test/v1/auth/token');
+    Http::assertSent(fn (Request $request): bool => $request->hasHeader('Authorization', 'Bearer fresh-token'));
+});
+
 it('resolves a current account by its exact code', function () {
-    Cache::put('cari_plus.access_token', 'cached-token', now()->addMinutes(10));
+    cacheCariPlusToken('cached-token');
     Http::fake([
         'api.cariplus.test/v1/current-accounts*' => Http::response([
             'data' => [[
@@ -125,7 +160,7 @@ it('resolves a current account by its exact code', function () {
 });
 
 it('lists active and archived product pages with the documented page size', function () {
-    Cache::put('cari_plus.access_token', 'cached-token', now()->addMinutes(10));
+    cacheCariPlusToken('cached-token');
     Http::fake([
         'api.cariplus.test/v1/products*' => Http::response([
             'data' => [[
@@ -146,7 +181,7 @@ it('lists active and archived product pages with the documented page size', func
 });
 
 it('creates an idempotent stockless product for a billable service', function () {
-    Cache::put('cari_plus.access_token', 'cached-token', now()->addMinutes(10));
+    cacheCariPlusToken('cached-token');
     Http::fake([
         'api.cariplus.test/v1/products' => Http::response([
             'data' => [
@@ -171,7 +206,7 @@ it('creates an idempotent stockless product for a billable service', function ()
 });
 
 it('converts Cari Plus error responses to a domain exception', function () {
-    Cache::put('cari_plus.access_token', 'cached-token', now()->addMinutes(10));
+    cacheCariPlusToken('cached-token');
     Http::fake([
         'api.cariplus.test/v1/sales-invoices' => Http::response([
             'error' => [
@@ -183,5 +218,32 @@ it('converts Cari Plus error responses to a domain exception', function () {
 
     $call = fn () => (new CariPlusClient)->createSalesInvoice([], 'portal-test-2');
 
-    expect($call)->toThrow(CariPlusException::class, 'Gönderilen veri geçersiz.');
+    expect($call)->toThrow(CariPlusException::class, 'Cari Plus gönderilen veriyi kabul etmedi.');
+});
+
+it('rejects a successful response without a positive resource id', function () {
+    cacheCariPlusToken('cached-token');
+    Http::fake([
+        'api.cariplus.test/v1/sales-invoices' => Http::response([
+            'data' => [],
+        ], 201),
+    ]);
+
+    $call = fn () => (new CariPlusClient)->createSalesInvoice([], 'portal-test-invalid');
+
+    expect($call)->toThrow(CariPlusException::class, 'Cari Plus beklenmeyen bir yanıt döndürdü.');
+});
+
+it('rejects a successful list response with an invalid shape', function () {
+    cacheCariPlusToken('cached-token');
+    Http::fake([
+        'api.cariplus.test/v1/products*' => Http::response([
+            'data' => 'invalid',
+            'meta' => [],
+        ]),
+    ]);
+
+    $call = fn () => (new CariPlusClient)->listProducts();
+
+    expect($call)->toThrow(CariPlusException::class, 'Cari Plus beklenmeyen bir liste yanıtı döndürdü.');
 });

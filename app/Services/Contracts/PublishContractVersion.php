@@ -7,13 +7,16 @@ use App\Models\ContractVersion;
 use Carbon\CarbonInterface;
 use Illuminate\Http\UploadedFile;
 use Illuminate\Support\Facades\DB;
-use Illuminate\Support\Facades\Storage;
 use Illuminate\Support\Str;
 use RuntimeException;
+use setasign\Fpdi\Fpdi;
+use setasign\Fpdi\PdfParser\StreamReader;
 use Throwable;
 
 class PublishContractVersion
 {
+    public function __construct(private EncryptedContractDocumentStorage $documents) {}
+
     /** @param list<int> $serviceIds */
     public function handle(
         ?Contract $contract,
@@ -27,6 +30,17 @@ class PublishContractVersion
 
         if ($bytes === false || ! str_starts_with($bytes, '%PDF-')) {
             throw new RuntimeException('PDF dosyası okunamadı veya geçerli bir PDF başlığı taşımıyor.');
+        }
+
+        try {
+            $pdf = new Fpdi;
+            $pageCount = $pdf->setSourceFile(StreamReader::createByString($bytes));
+
+            if ($pageCount < 1 || $pageCount > 500) {
+                throw new RuntimeException('PDF sayfa sayısı geçersiz.');
+            }
+        } catch (Throwable $exception) {
+            throw new RuntimeException('PDF dosyası yapısal olarak doğrulanamadı.', previous: $exception);
         }
 
         $storedPath = null;
@@ -49,9 +63,7 @@ class PublishContractVersion
                 $versionUuid = (string) Str::uuid();
                 $storedPath = "contracts/versions/{$resolvedContract->uuid}/{$version}-{$versionUuid}.pdf";
 
-                if (! Storage::disk('local')->put($storedPath, $bytes)) {
-                    throw new RuntimeException('Sözleşme PDF dosyası güvenli depolamaya yazılamadı.');
-                }
+                $this->documents->put($storedPath, $bytes);
 
                 $contractVersion = ContractVersion::query()->create([
                     'uuid' => $versionUuid,
@@ -73,7 +85,7 @@ class PublishContractVersion
             });
         } catch (Throwable $exception) {
             if ($storedPath !== null) {
-                Storage::disk('local')->delete($storedPath);
+                $this->documents->delete($storedPath);
             }
 
             throw $exception;

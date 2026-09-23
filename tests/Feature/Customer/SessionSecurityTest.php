@@ -87,4 +87,29 @@ class SessionSecurityTest extends TestCase
             route('customer.login')
         );
     }
+
+    public function test_inactive_customer_with_a_current_session_is_forced_to_logout(): void
+    {
+        $customer = Customer::factory()
+            ->ready()
+            ->create([
+                'is_active' => false,
+                'session_version' => 3,
+            ]);
+
+        $response = $this
+            ->actingAs(
+                $customer,
+                'customer'
+            )
+            ->withSession([
+                'customer_session_version' => 3,
+            ])
+            ->get(
+                route('customer.dashboard')
+            );
+
+        $this->assertGuest('customer');
+        $response->assertRedirect(route('customer.login'));
+    }
 }

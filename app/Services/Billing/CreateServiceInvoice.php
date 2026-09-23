@@ -68,6 +68,10 @@ class CreateServiceInvoice
 
     public function retry(Invoice $invoice): Invoice
     {
+        if (! in_array($invoice->status, [InvoiceStatus::Draft, InvoiceStatus::Failed], true)) {
+            throw new CariPlusException('Bu fatura yeniden gönderilmeye uygun değil.');
+        }
+
         try {
             $invoice = $this->send($invoice->loadMissing('customer', 'service', 'items', 'serviceOrder'));
             $invoice->serviceOrder?->update([
@@ -95,20 +99,16 @@ class CreateServiceInvoice
         }
 
         if ($order->invoice !== null) {
-            if ($order->invoice->status === InvoiceStatus::Unpaid) {
-                return $order->invoice;
-            }
-
-            return $this->retry($order->invoice);
+            return $order->invoice;
         }
 
         $this->resolveCurrentAccount->for($order->customer);
-        $invoice = DB::transaction(function () use ($order): Invoice {
+        [$invoice, $wasCreated] = DB::transaction(function () use ($order): array {
             $lockedOrder = ServiceOrder::query()->lockForUpdate()->findOrFail($order->id);
             $existing = Invoice::query()->whereBelongsTo($lockedOrder, 'serviceOrder')->first();
 
             if ($existing !== null) {
-                return $existing;
+                return [$existing, false];
             }
 
             $grossTotal = (float) $lockedOrder->unit_price;
@@ -138,8 +138,12 @@ class CreateServiceInvoice
                 'line_total' => $grossTotal,
             ]);
 
-            return $invoice;
+            return [$invoice, true];
         });
+
+        if (! $wasCreated) {
+            return $invoice;
+        }
 
         try {
             $invoice = $this->send($invoice->load('customer', 'service', 'items'));
@@ -176,6 +180,10 @@ class CreateServiceInvoice
                 (int) $invoice->cari_plus_invoice_id,
                 $invoice->idempotency_key.'-issue',
             );
+
+            if (($issued['id'] ?? null) !== $invoice->cari_plus_invoice_id) {
+                throw new CariPlusException('Cari Plus beklenmeyen bir fatura kimliği döndürdü.');
+            }
 
             $this->updateFromRemote($invoice, $issued, InvoiceStatus::Unpaid);
 
@@ -239,8 +247,25 @@ class CreateServiceInvoice
         array $remote,
         InvoiceStatus $status,
     ): void {
+        $remoteId = $remote['id'] ?? null;
+
+        if (! is_int($remoteId) || $remoteId <= 0) {
+            throw new CariPlusException('Cari Plus geçerli bir fatura kimliği döndürmedi.');
+        }
+
+        $expectedRemoteStatus = $status === InvoiceStatus::Draft ? 'draft' : 'issued';
+        $remoteTotal = $remote['total'] ?? null;
+
+        if (($remote['status'] ?? null) !== $expectedRemoteStatus
+            || ($remote['currency'] ?? null) !== $invoice->currency
+            || (! is_int($remoteTotal) && ! is_float($remoteTotal))
+            || ! is_finite((float) $remoteTotal)
+            || (int) round($remoteTotal * 100) !== (int) round((float) $invoice->total * 100)) {
+            throw new CariPlusException('Cari Plus faturası sözleşmedeki tutar, para birimi veya durumla eşleşmiyor.');
+        }
+
         $invoice->update([
-            'cari_plus_invoice_id' => $remote['id'],
+            'cari_plus_invoice_id' => $remoteId,
             'invoice_number' => $remote['invoice_number'] ?? null,
             'status' => $status,
             'collection_status' => $remote['collection_status'] ?? null,

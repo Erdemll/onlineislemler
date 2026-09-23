@@ -80,14 +80,14 @@ class RegisterCustomerRequest extends FormRequest
         return [function (Validator $validator): void {
             if ($this->input('account_type') === CustomerType::Individual->value
                 && ! $validator->errors()->has('national_id')
-                && Customer::where('national_id_hash', Customer::identityHash((string) $this->national_id))->exists()) {
-                $validator->errors()->add('national_id', 'Bu T.C. kimlik numarası zaten kullanılmaktadır.');
+                && Customer::whereIn('national_id_hash', Customer::identityHashes((string) $this->national_id))->exists()) {
+                $validator->errors()->add('national_id', 'Bu bilgilerle kayıt işlemi tamamlanamadı. Giriş veya şifre sıfırlama adımlarını kullanın.');
             }
 
             if ($this->input('account_type') === CustomerType::Corporate->value
                 && ! $validator->errors()->has('tax_number')
-                && Customer::where('tax_number_hash', Customer::identityHash((string) $this->tax_number))->exists()) {
-                $validator->errors()->add('tax_number', 'Bu vergi numarası zaten kullanılmaktadır.');
+                && Customer::whereIn('tax_number_hash', Customer::identityHashes((string) $this->tax_number))->exists()) {
+                $validator->errors()->add('tax_number', 'Bu bilgilerle kayıt işlemi tamamlanamadı. Giriş veya şifre sıfırlama adımlarını kullanın.');
             }
         }];
     }
@@ -105,10 +105,10 @@ class RegisterCustomerRequest extends FormRequest
             'company_title.required' => 'Firma ünvanı zorunludur.',
             'email.required' => 'E-posta alanı zorunludur.',
             'email.email' => 'Geçerli bir e-posta adresi giriniz.',
-            'email.unique' => 'Bu e-posta adresi zaten kullanılmaktadır.',
+            'email.unique' => 'Bu bilgilerle kayıt işlemi tamamlanamadı. Giriş veya şifre sıfırlama adımlarını kullanın.',
             'phone.required' => 'Telefon numarası zorunludur.',
             'phone.regex' => 'Geçerli bir Türkiye telefon numarası giriniz.',
-            'phone.unique' => 'Bu telefon numarası zaten kullanılmaktadır.',
+            'phone.unique' => 'Bu bilgilerle kayıt işlemi tamamlanamadı. Giriş veya şifre sıfırlama adımlarını kullanın.',
             'mobile_phone.regex' => 'Geçerli bir cep telefonu numarası giriniz.',
             'province_code.required' => 'İl seçimi zorunludur.',
             'province_code.in' => 'Geçerli bir il seçiniz.',

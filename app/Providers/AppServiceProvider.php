@@ -4,10 +4,12 @@ namespace App\Providers;
 
 use App\Contracts\CariPlusGateway;
 use App\Contracts\SmsSender;
+use App\Contracts\ToslaGateway;
 use App\Contracts\VerificationCodeSender;
 use App\Models\User;
 use App\Services\CariPlus\CariPlusClient;
 use App\Services\Sms\VerimorSmsService;
+use App\Services\Tosla\ToslaClient;
 use App\Services\Verification\EmailVerificationCodeSender;
 use Illuminate\Cache\RateLimiting\Limit;
 use Illuminate\Http\Request;
@@ -33,6 +35,11 @@ class AppServiceProvider extends ServiceProvider
         $this->app->bind(
             CariPlusGateway::class,
             CariPlusClient::class
+        );
+
+        $this->app->bind(
+            ToslaGateway::class,
+            ToslaClient::class
         );
     }
 
@@ -164,14 +171,23 @@ class AppServiceProvider extends ServiceProvider
                 ->by($request->user('customer')->id);
         });
 
+        RateLimiter::for('customer-payment', function (Request $request) {
+            return Limit::perMinute(3)
+                ->by($request->user('customer')->id);
+        });
+
+        RateLimiter::for('payment-callback', function (Request $request) {
+            return Limit::perMinute(300)->by($request->ip());
+        });
+
         RateLimiter::for('customer-invoice-sync', function (Request $request) {
             return Limit::perMinute(2)
                 ->by($request->user('customer')->id);
         });
 
-        RateLimiter::for('customer-product-sync', function () {
-            return Limit::perMinute(1)
-                ->by('cari-plus-products');
+        RateLimiter::for('customer-product-sync', function (Request $request) {
+            return Limit::perMinute(10)
+                ->by($request->user('customer')->id);
         });
 
         RateLimiter::for('customer-support', function (Request $request) {

@@ -7,6 +7,7 @@ use App\Models\ContractVersion;
 use App\Models\Customer;
 use App\Models\ServiceOrder;
 use App\Models\User;
+use App\Services\Contracts\EncryptedContractDocumentStorage;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 use Illuminate\Support\Facades\Storage;
 
@@ -31,7 +32,7 @@ beforeEach(function () {
         ->create();
     $signedBytes = "%PDF-1.4\nsigned contract\n%%EOF";
     $documentPath = 'contracts/acceptances/signed.pdf';
-    Storage::disk('local')->put($documentPath, $signedBytes);
+    app(EncryptedContractDocumentStorage::class)->put($documentPath, $signedBytes);
 
     $this->acceptance = ContractAcceptance::factory()
         ->for($this->version, 'contractVersion')

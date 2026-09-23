@@ -2,8 +2,10 @@
 
 use App\Contracts\CariPlusGateway;
 use App\Enums\InvoiceStatus;
+use App\Enums\ServiceOrderStatus;
 use App\Models\Customer;
 use App\Models\Invoice;
+use App\Models\ServiceOrder;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 use Tests\Fakes\FakeCariPlusGateway;
 
@@ -91,4 +93,36 @@ it('does not issue a draft imported from Cari Plus', function () {
 
     $response->assertConflict();
     expect($gateway->issued)->toBeEmpty();
+});
+
+it('advances the invoice and service order when Cari Plus reports payment', function () {
+    $customer = Customer::factory()->ready()->create([
+        'cari_plus_current_account_id' => 55,
+    ]);
+    $order = ServiceOrder::factory()->for($customer)->create([
+        'status' => ServiceOrderStatus::Invoiced,
+    ]);
+    $invoice = Invoice::factory()->for($customer)->for($order, 'serviceOrder')->create([
+        'cari_plus_invoice_id' => 901,
+        'status' => InvoiceStatus::Unpaid,
+    ]);
+    $gateway = new FakeCariPlusGateway;
+    $gateway->remoteInvoices = [[
+        'id' => 901,
+        'invoice_number' => 'FTR-PAID',
+        'status' => 'paid',
+        'collection_status' => 'collected',
+        'currency' => 'TRY',
+        'subtotal' => 100,
+        'tax_amount' => 20,
+        'total' => 120,
+        'invoice_date' => '2026-09-16',
+        'due_date' => '2026-09-30',
+    ]];
+    $this->app->instance(CariPlusGateway::class, $gateway);
+
+    $this->actingAsCustomer($customer)->post(route('customer.invoices.sync'));
+
+    expect($invoice->fresh()->status)->toBe(InvoiceStatus::Paid)
+        ->and($order->fresh()->status)->toBe(ServiceOrderStatus::Paid);
 });

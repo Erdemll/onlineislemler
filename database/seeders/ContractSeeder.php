@@ -5,8 +5,8 @@ namespace Database\Seeders;
 use App\Models\Contract;
 use App\Models\ContractVersion;
 use App\Models\Service;
+use App\Services\Contracts\EncryptedContractDocumentStorage;
 use Illuminate\Database\Seeder;
-use Illuminate\Support\Facades\Storage;
 use Illuminate\Support\Str;
 use RuntimeException;
 
@@ -48,9 +48,7 @@ class ContractSeeder extends Seeder
             throw new RuntimeException('Yayımlanmış 1.0 sözleşme dosyası değiştirilmiş. Yeni bir sürüm oluşturun.');
         }
 
-        if (! Storage::disk('local')->put($documentPath, $bytes)) {
-            throw new RuntimeException('Sözleşme güvenli depolamaya yazılamadı.');
-        }
+        app(EncryptedContractDocumentStorage::class)->put($documentPath, $bytes);
 
         $version = ContractVersion::query()->firstOrCreate(
             ['contract_id' => $contract->id, 'version' => '1.0'],

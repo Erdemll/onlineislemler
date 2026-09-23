@@ -53,6 +53,8 @@ class CustomerFactory extends Factory
 
             'is_active' => true,
 
+            'credit_limit' => 0,
+
             'session_version' => 1,
             'password_changed_at' => null,
 
@@ -98,6 +100,13 @@ class CustomerFactory extends Factory
     {
         return $this->state(fn () => [
             'is_active' => false,
+        ]);
+    }
+
+    public function withCreditLimit(int $kurus): static
+    {
+        return $this->state(fn () => [
+            'credit_limit' => $kurus,
         ]);
     }
 

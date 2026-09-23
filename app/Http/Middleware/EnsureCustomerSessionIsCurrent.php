@@ -31,7 +31,8 @@ class EnsureCustomerSessionIsCurrent
             );
 
         if (
-            $sessionVersion === null
+            ! $customer->is_active
+            || $sessionVersion === null
             || (int) $sessionVersion
             !== (int) $customer->session_version
         ) {

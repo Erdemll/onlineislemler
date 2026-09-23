@@ -35,5 +35,14 @@ interface CariPlusGateway
      */
     public function createProduct(array $payload, string $idempotencyKey): array;
 
+    /** @return list<array<string, mixed>> */
+    public function listCompanyAccounts(): array;
+
+    /**
+     * @param  array<string, mixed>  $payload
+     * @return array<string, mixed>
+     */
+    public function createInvoiceCollection(array $payload, string $idempotencyKey): array;
+
     public function isConfigured(): bool;
 }

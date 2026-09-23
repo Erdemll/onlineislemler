@@ -15,24 +15,23 @@ use Illuminate\Support\Str;
 
 #[Signature('customer:create-test
     {email=test@example.com : Test müşterisinin e-posta adresi}
-    {phone=05550000001 : Test müşterisinin telefon numarası}
-    {--password= : Boş bırakılırsa güvenli bir şifre üretilir}
-    {--force : Production ortamında çalıştırmaya izin ver}')]
+    {phone=05550000001 : Test müşterisinin telefon numarası}')]
 #[Description('SMS göndermeden kullanılabilecek doğrulanmış bir test müşterisi oluşturur')]
 class CreateVerifiedTestCustomer extends Command
 {
     public function handle(): int
     {
-        if ($this->laravel->isProduction() && ! $this->option('force')) {
-            $this->components->error('Production ortamında kullanmak için --force seçeneği gereklidir.');
+        if ($this->laravel->isProduction()) {
+            $this->components->error('Test müşterisi production ortamında oluşturulamaz.');
 
             return self::FAILURE;
         }
 
         $email = mb_strtolower(trim((string) $this->argument('email')));
         $phone = PhoneNormalizer::normalize((string) $this->argument('phone'));
-        $passwordOption = trim((string) $this->option('password'));
-        $password = $passwordOption !== '' ? $passwordOption : Str::password(20);
+        $passwordInput = trim((string) $this->secret('Parola (güvenli parola üretmek için boş bırakın)'));
+        $generatedPassword = $passwordInput === '';
+        $password = $generatedPassword ? Str::password(20) : $passwordInput;
 
         $validator = Validator::make([
             'email' => $email,
@@ -86,14 +85,12 @@ class CreateVerifiedTestCustomer extends Command
         });
 
         $this->components->info('Doğrulanmış test müşterisi hazır.');
-        $this->table(
-            ['Alan', 'Değer'],
-            [
-                ['E-posta', $customer->email],
-                ['Telefon', $customer->phone],
-                ['Şifre', $password],
-            ],
-        );
+        $this->line("E-posta: {$customer->email}");
+        $this->line("Telefon: {$customer->phone}");
+
+        if ($generatedPassword) {
+            $this->line("Üretilen parola: {$password}");
+        }
 
         return self::SUCCESS;
     }

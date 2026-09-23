@@ -4,6 +4,7 @@ use App\Http\Controllers\Admin\AuthenticatedSessionController as AdminAuthentica
 use App\Http\Controllers\Admin\ContractAcceptanceController as AdminContractAcceptanceController;
 use App\Http\Controllers\Admin\ContractController as AdminContractController;
 use App\Http\Controllers\Admin\ContractDocumentController as AdminContractDocumentController;
+use App\Http\Controllers\Admin\CustomerController as AdminCustomerController;
 use App\Http\Controllers\Admin\DashboardController as AdminDashboardController;
 use App\Http\Controllers\Admin\ProductSyncController as AdminProductSyncController;
 use App\Http\Controllers\Admin\SupportReplyController as AdminSupportReplyController;
@@ -17,6 +18,7 @@ use App\Http\Controllers\Customer\EmailVerificationController;
 use App\Http\Controllers\Customer\ForgotPasswordController;
 use App\Http\Controllers\Customer\InvoiceController;
 use App\Http\Controllers\Customer\InvoiceIssueController;
+use App\Http\Controllers\Customer\InvoicePaymentController;
 use App\Http\Controllers\Customer\InvoiceSyncController;
 use App\Http\Controllers\Customer\LoginController;
 use App\Http\Controllers\Customer\PhoneChangeController;
@@ -29,6 +31,7 @@ use App\Http\Controllers\Customer\ServiceOrderContractController;
 use App\Http\Controllers\Customer\ServicePurchaseController;
 use App\Http\Controllers\Customer\SupportReplyController;
 use App\Http\Controllers\Customer\SupportTicketController;
+use App\Http\Controllers\Payments\ToslaCallbackController;
 use Illuminate\Support\Facades\Route;
 
 Route::get('/', function () {
@@ -71,6 +74,10 @@ Route::prefix('admin')->name('admin.')->group(function () {
         Route::patch('/destek/{supportTicket:uuid}/durum', AdminSupportTicketStatusController::class)
             ->middleware('throttle:admin-support')
             ->name('support.status.update');
+        // Customer management
+        Route::get('/musteriler', [AdminCustomerController::class, 'index'])->name('customers.index');
+        Route::get('/musteriler/{customer:uuid}/duzenle', [AdminCustomerController::class, 'edit'])->name('customers.edit');
+        Route::patch('/musteriler/{customer:uuid}', [AdminCustomerController::class, 'update'])->name('customers.update');
     });
 });
 
@@ -251,6 +258,13 @@ Route::middleware([
         ->middleware('throttle:customer-purchase')
         ->name('customer.invoices.retry');
 
+    Route::post(
+        '/online-islemler/faturalar/{invoice:uuid}/ode',
+        [InvoicePaymentController::class, 'store']
+    )
+        ->middleware('throttle:customer-payment')
+        ->name('customer.invoices.pay');
+
     Route::get(
         '/online-islemler/hizmetler',
         [ServiceController::class, 'index']
@@ -403,3 +417,7 @@ Route::middleware([
         ])
         ->name('customer.current-account.provision');
 });
+
+Route::post('/odeme/callback/akode', ToslaCallbackController::class)
+    ->middleware('throttle:payment-callback')
+    ->name('payment.callback.akode');

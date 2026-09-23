@@ -9,6 +9,7 @@ use Illuminate\Database\Eloquent\Factories\HasFactory;
 use Illuminate\Database\Eloquent\Relations\HasMany;
 use Illuminate\Foundation\Auth\User as Authenticatable;
 use Illuminate\Notifications\Notifiable;
+use RuntimeException;
 
 class Customer extends Authenticatable
 {
@@ -33,6 +34,7 @@ class Customer extends Authenticatable
         'spending_unit_tax_number',
         'spending_unit_title',
         'password',
+        'credit_limit',
     ];
 
     protected $hidden = [
@@ -45,6 +47,13 @@ class Customer extends Authenticatable
         'spending_unit_tax_number',
     ];
 
+    /**
+     * Attributes to append to the model.
+     *
+     * @var string[]
+     */
+    protected $appends = ['masked_national_id', 'masked_tax_number'];
+
     protected function casts(): array
     {
         return [
@@ -55,12 +64,29 @@ class Customer extends Authenticatable
             'password_changed_at' => 'datetime',
             'password' => 'hashed',
             'is_active' => 'boolean',
+            'credit_limit' => 'integer',
         ];
     }
 
     public static function identityHash(string $value): string
     {
-        return hash_hmac('sha256', $value, (string) config('app.key'));
+        return hash_hmac('sha256', $value, self::identityIndexKey());
+    }
+
+    /** @return list<string> */
+    public static function identityHashes(string $value): array
+    {
+        $keys = [
+            self::identityIndexKey(),
+            ...config('app.customer_identity_index_previous_keys', []),
+        ];
+
+        return collect($keys)
+            ->filter(fn (mixed $key): bool => is_string($key) && $key !== '')
+            ->unique()
+            ->map(fn (string $key): string => hash_hmac('sha256', $value, $key))
+            ->values()
+            ->all();
     }
 
     public function billingTitle(): string
@@ -112,6 +138,30 @@ class Customer extends Authenticatable
         );
     }
 
+    /**
+     * Masked national ID, showing only last two characters.
+     */
+    protected function maskedNationalId(): Attribute
+    {
+        return Attribute::make(
+            get: fn (): ?string => $this->national_id === null
+                ? null
+                : preg_replace('/.(?=.{2})/', '*', $this->national_id),
+        );
+    }
+
+    /**
+     * Masked tax number, showing only last two characters.
+     */
+    protected function maskedTaxNumber(): Attribute
+    {
+        return Attribute::make(
+            get: fn (): ?string => $this->tax_number === null
+                ? null
+                : preg_replace('/.(?=.{2})/', '*', $this->tax_number),
+        );
+    }
+
     public function uniqueIds(): array
     {
         return ['uuid'];
@@ -140,5 +190,20 @@ class Customer extends Authenticatable
     public function supportMessages(): HasMany
     {
         return $this->hasMany(SupportMessage::class);
+    }
+
+    private static function identityIndexKey(): string
+    {
+        $key = config('app.customer_identity_index_key');
+
+        if (is_string($key) && $key !== '') {
+            return $key;
+        }
+
+        if (! app()->isProduction()) {
+            return (string) config('app.key');
+        }
+
+        throw new RuntimeException('CUSTOMER_IDENTITY_INDEX_KEY production ortamında tanımlanmalıdır.');
     }
 }

@@ -88,6 +88,13 @@
                                         <button type="submit" class="border border-slate-950 px-3 py-1 text-xs font-black hover:bg-slate-950 hover:text-white">Tekrar dene</button>
                                     </form>
                                 @endif
+
+                                @if ($invoice->status === \App\Enums\InvoiceStatus::Unpaid)
+                                    <form method="POST" action="{{ route('customer.invoices.pay', $invoice->uuid) }}">
+                                        @csrf
+                                        <button type="submit" class="bg-[#1746d1] px-3 py-1 text-xs font-black text-white hover:bg-slate-950">Öde</button>
+                                    </form>
+                                @endif
                             </div>
                         </article>
                     @endforeach

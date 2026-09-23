@@ -15,7 +15,8 @@ class ContractAcceptanceEvent extends Model
 
     protected $fillable = [
         'service_order_id', 'contract_acceptance_id', 'customer_id', 'sequence',
-        'event_type', 'metadata', 'previous_hash', 'event_hash', 'occurred_at',
+        'event_type', 'metadata', 'previous_hash', 'event_hash', 'hash_version',
+        'occurred_at',
     ];
 
     protected function casts(): array

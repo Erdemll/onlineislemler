@@ -51,6 +51,51 @@ document.querySelectorAll('[data-admin-contract-form]').forEach((form) => {
     syncContractMode();
 });
 
+document.querySelectorAll('[data-product-sync-form]').forEach(async (form) => {
+    const status = document.querySelector('[data-product-sync-status]');
+    const message = status?.querySelector('[data-product-sync-message]');
+    const catalog = document.querySelector('[data-product-catalog]');
+    const url = new URL(window.location.href);
+    const redirectParameter = form.dataset.productSyncRedirect;
+
+    if (url.searchParams.has(redirectParameter)) {
+        url.searchParams.delete(redirectParameter);
+        window.history.replaceState({}, '', url);
+        status?.classList.add('hidden');
+
+        return;
+    }
+
+    catalog?.classList.add('opacity-50');
+
+    try {
+        const response = await fetch(form.action, {
+            method: 'POST',
+            body: new FormData(form),
+            credentials: 'same-origin',
+            headers: {
+                Accept: 'application/json',
+                'X-Requested-With': 'XMLHttpRequest',
+            },
+        });
+
+        if (!response.ok) {
+            const body = await response.json().catch(() => ({}));
+            throw new Error(body.message || 'Ürünler şu anda güncellenemedi.');
+        }
+
+        url.searchParams.set(redirectParameter, '1');
+        window.location.replace(url);
+    } catch (error) {
+        catalog?.classList.remove('opacity-50');
+        status?.querySelector('[aria-hidden="true"]')?.classList.add('hidden');
+
+        if (message) {
+            message.textContent = error.message;
+        }
+    }
+});
+
 document.querySelectorAll('[data-signature-form]').forEach((form) => {
     const canvas = form.querySelector('[data-signature-canvas]');
     const hiddenInput = form.querySelector('[data-signature-data]');

@@ -105,6 +105,12 @@ return [
         ),
     ],
 
+    'customer_identity_index_key' => env('CUSTOMER_IDENTITY_INDEX_KEY'),
+
+    'customer_identity_index_previous_keys' => [
+        ...array_filter(explode(',', (string) env('CUSTOMER_IDENTITY_INDEX_PREVIOUS_KEYS', ''))),
+    ],
+
     /*
     |--------------------------------------------------------------------------
     | Maintenance Mode Driver

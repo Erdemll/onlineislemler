@@ -16,8 +16,8 @@ class CreateVerifiedTestCustomerCommandTest extends TestCase
         $this->artisan('customer:create-test', [
             'email' => 'demo@example.com',
             'phone' => '0555 123 45 67',
-            '--password' => 'TestPassword123!',
         ])
+            ->expectsQuestion('Parola (güvenli parola üretmek için boş bırakın)', 'TestPassword123!')
             ->expectsOutputToContain('Doğrulanmış test müşterisi hazır.')
             ->assertSuccessful();
 
@@ -42,8 +42,9 @@ class CreateVerifiedTestCustomerCommandTest extends TestCase
         $this->artisan('customer:create-test', [
             'email' => 'demo@example.com',
             'phone' => '05551234567',
-            '--password' => 'NewTestPassword123!',
-        ])->assertSuccessful();
+        ])
+            ->expectsQuestion('Parola (güvenli parola üretmek için boş bırakın)', 'NewTestPassword123!')
+            ->assertSuccessful();
 
         $customer = Customer::sole();
 
@@ -58,8 +59,9 @@ class CreateVerifiedTestCustomerCommandTest extends TestCase
         $this->artisan('customer:create-test', [
             'email' => 'demo@example.com',
             'phone' => '02121234567',
-            '--password' => 'TestPassword123!',
-        ])->assertFailed();
+        ])
+            ->expectsQuestion('Parola (güvenli parola üretmek için boş bırakın)', 'TestPassword123!')
+            ->assertFailed();
 
         $this->assertDatabaseCount('customers', 0);
     }

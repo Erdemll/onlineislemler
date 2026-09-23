@@ -12,6 +12,11 @@ use Tests\Fakes\FakeCariPlusGateway;
 
 uses(RefreshDatabase::class);
 
+function adminContractPdfBytes(): string
+{
+    return file_get_contents(public_path('sozlesmeler/Kamera-Sistemleri-Abonelik-Sozlesmesi-Tepenet.pdf'));
+}
+
 beforeEach(function () {
     Storage::fake('local');
     $this->cariPlus = new FakeCariPlusGateway;
@@ -24,7 +29,7 @@ test('an administrator can publish a new contract and associate products', funct
         ['name' => 'Kamera Sistemi', 'cari_plus_product_id' => 101],
         ['name' => 'Alarm Hizmeti', 'cari_plus_product_id' => 102],
     )->create();
-    $pdfBytes = "%PDF-1.4\nadmin contract\n%%EOF";
+    $pdfBytes = adminContractPdfBytes();
 
     $response = $this->actingAs($this->admin)->post(route('admin.contracts.store'), [
         'contract_mode' => 'new',
@@ -58,7 +63,7 @@ test('an administrator can add a version to an existing contract', function () {
         'contract_id' => $contract->id,
         'version' => '2.0',
         'effective_at' => now()->addDay()->format('Y-m-d H:i:s'),
-        'document' => UploadedFile::fake()->createWithContent('sozlesme.pdf', "%PDF-1.4\nversion two\n%%EOF"),
+        'document' => UploadedFile::fake()->createWithContent('sozlesme.pdf', adminContractPdfBytes()),
         'service_ids' => [$service->id],
     ])->assertRedirect(route('admin.contracts.index'));
 

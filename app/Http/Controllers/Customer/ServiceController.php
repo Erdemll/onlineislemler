@@ -20,12 +20,15 @@ class ServiceController extends Controller
                 ->orderByDesc('effective_at')])
             ->where('is_active', true)
             ->whereNotNull('cari_plus_product_id')
+            ->orderBy('category_name')
             ->orderBy('name')
             ->orderBy('id')
-            ->get();
+            ->get()
+            ->groupBy(fn (Service $service): string => $service->category_name ?? 'Kategorisiz');
 
         return view('customer.services.index', [
-            'services' => $services,
+            'groupedServices' => $services,
+            'creditLimitKurus' => (int) ($request->user('customer')->credit_limit ?? 0),
             'lastSyncedAt' => Service::query()
                 ->whereNotNull('cari_plus_product_id')
                 ->whereNotNull('synced_at')

@@ -15,6 +15,7 @@ use App\Services\Billing\CreateServiceInvoice;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Hash;
 use Illuminate\Support\Str;
+use Throwable;
 
 class AcceptContract
 {
@@ -22,6 +23,7 @@ class AcceptContract
         private GenerateSignedContractPdf $pdf,
         private RecordContractAuditEvent $audit,
         private CreateServiceInvoice $createInvoice,
+        private EncryptedContractDocumentStorage $documents,
     ) {}
 
     public function accept(
@@ -29,6 +31,9 @@ class AcceptContract
         ServiceOrder $order,
         string $challengeUuid,
         string $code,
+        string $ipAddress,
+        ?string $userAgent,
+        string $sessionIdentifier,
     ): ContractAcceptance {
         $order->loadMissing('contractVersion.contract');
 
@@ -39,8 +44,6 @@ class AcceptContract
         $existing = $order->acceptance;
 
         if ($existing !== null) {
-            $this->createInvoiceIfNeeded($order, $existing);
-
             return $existing;
         }
 
@@ -54,73 +57,95 @@ class AcceptContract
             throw new ContractSigningException('Sözleşme doğrulama kaydı bulunamadı.');
         }
 
-        $newlyVerified = $this->verifyChallenge($challenge, $code);
-
-        if ($newlyVerified) {
-            $this->audit->record($order, 'otp_verified', [
-                'challenge_uuid' => $challenge->uuid,
-                'delivery_channel' => $challenge->delivery_channel,
-            ]);
-        }
+        $sessionIdentifierHash = hash('sha256', $sessionIdentifier);
+        $this->verifyChallenge($challenge, $code, $sessionIdentifierHash);
 
         $acceptanceUuid = (string) Str::uuid();
         $acceptedAt = now();
         $generated = $this->pdf->generate($order, $customer, $challenge, $acceptanceUuid, $acceptedAt);
 
-        $acceptance = DB::transaction(function () use (
-            $customer,
-            $order,
-            $challenge,
-            $acceptanceUuid,
-            $acceptedAt,
-            $generated,
-        ): ContractAcceptance {
-            $lockedOrder = ServiceOrder::query()->lockForUpdate()->findOrFail($order->id);
-            $existing = ContractAcceptance::query()->whereBelongsTo($lockedOrder, 'serviceOrder')->first();
+        try {
+            [$acceptance, $wasCreated] = DB::transaction(function () use (
+                $customer,
+                $order,
+                $challenge,
+                $acceptanceUuid,
+                $acceptedAt,
+                $generated,
+                $ipAddress,
+                $userAgent,
+                $sessionIdentifierHash,
+                $code,
+            ): array {
+                $lockedOrder = ServiceOrder::query()->lockForUpdate()->findOrFail($order->id);
+                $existing = ContractAcceptance::query()->whereBelongsTo($lockedOrder, 'serviceOrder')->first();
 
-            if ($existing !== null) {
-                return $existing;
-            }
+                if ($existing !== null) {
+                    return [$existing, false];
+                }
 
-            $lockedChallenge = ContractSigningChallenge::query()->lockForUpdate()->findOrFail($challenge->id);
+                $lockedChallenge = ContractSigningChallenge::query()->lockForUpdate()->findOrFail($challenge->id);
 
-            if ($lockedChallenge->verified_at === null || $lockedChallenge->consumed_at !== null) {
-                throw new ContractSigningException('Sözleşme doğrulaması artık geçerli değil.');
-            }
+                if ($lockedChallenge->consumed_at !== null
+                    || $lockedChallenge->expires_at->isPast()
+                    || $lockedChallenge->attempts >= 5
+                    || ! hash_equals($lockedChallenge->session_identifier_hash, $sessionIdentifierHash)
+                    || ! Hash::check($code, $lockedChallenge->code_hash)) {
+                    throw new ContractSigningException('Sözleşme doğrulaması artık geçerli değil.');
+                }
 
-            $acceptance = ContractAcceptance::query()->create([
-                'uuid' => $acceptanceUuid,
-                'contract_version_id' => $lockedOrder->contract_version_id,
-                'service_order_id' => $lockedOrder->id,
-                'customer_id' => $customer->id,
-                'contract_signing_challenge_id' => $lockedChallenge->id,
-                'contract_name_snapshot' => $order->contractVersion->contract->name,
-                'contract_version_snapshot' => $order->contractVersion->version,
-                'signer_name_snapshot' => trim($customer->first_name.' '.$customer->last_name),
-                'company_title_snapshot' => $customer->company_title,
-                'email_snapshot' => $customer->email,
-                'phone_snapshot' => $customer->phone,
-                'acceptance_method' => ContractAcceptanceMethod::EmailOtp,
-                'delivery_channel' => $lockedChallenge->delivery_channel,
-                'source_document_hash' => $lockedChallenge->source_document_hash,
-                'signature_hash' => $lockedChallenge->signature_hash,
-                'signed_document_hash' => $generated['signed_document_hash'],
-                'signature_path' => $lockedChallenge->signature_path,
-                'document_path' => $generated['document_path'],
-                'accepted_at' => $acceptedAt,
-                'ip_address' => $lockedChallenge->ip_address,
-                'user_agent' => $lockedChallenge->user_agent,
-                'session_identifier_hash' => $lockedChallenge->session_identifier_hash,
-            ]);
+                $acceptance = ContractAcceptance::query()->create([
+                    'uuid' => $acceptanceUuid,
+                    'contract_version_id' => $lockedOrder->contract_version_id,
+                    'service_order_id' => $lockedOrder->id,
+                    'customer_id' => $customer->id,
+                    'contract_signing_challenge_id' => $lockedChallenge->id,
+                    'contract_name_snapshot' => $order->contractVersion->contract->name,
+                    'contract_version_snapshot' => $order->contractVersion->version,
+                    'signer_name_snapshot' => trim($customer->first_name.' '.$customer->last_name),
+                    'company_title_snapshot' => $customer->company_title,
+                    'email_snapshot' => $customer->email,
+                    'phone_snapshot' => $customer->phone,
+                    'acceptance_method' => ContractAcceptanceMethod::EmailOtp,
+                    'delivery_channel' => $lockedChallenge->delivery_channel,
+                    'source_document_hash' => $lockedChallenge->source_document_hash,
+                    'signature_hash' => $lockedChallenge->signature_hash,
+                    'signed_document_hash' => $generated['signed_document_hash'],
+                    'signature_path' => $lockedChallenge->signature_path,
+                    'document_path' => $generated['document_path'],
+                    'accepted_at' => $acceptedAt,
+                    'ip_address' => $ipAddress,
+                    'user_agent' => $userAgent,
+                    'session_identifier_hash' => $sessionIdentifierHash,
+                ]);
 
-            $lockedChallenge->update(['consumed_at' => now()]);
-            $lockedOrder->update([
-                'status' => ServiceOrderStatus::ContractAccepted,
-                'last_error' => null,
-            ]);
+                $lockedChallenge->update([
+                    'verified_at' => now(),
+                    'consumed_at' => now(),
+                ]);
+                $lockedOrder->update([
+                    'status' => ServiceOrderStatus::ContractAccepted,
+                    'last_error' => null,
+                ]);
+
+                return [$acceptance, true];
+            });
+        } catch (Throwable $exception) {
+            $this->documents->delete($generated['document_path']);
+
+            throw $exception;
+        }
+
+        if (! $wasCreated) {
+            $this->documents->delete($generated['document_path']);
 
             return $acceptance;
-        });
+        }
+
+        $this->audit->record($order, 'otp_verified', [
+            'challenge_uuid' => $challenge->uuid,
+            'delivery_channel' => $challenge->delivery_channel,
+        ]);
 
         $this->audit->record($order, 'contract_accepted', [
             'acceptance_uuid' => $acceptance->uuid,
@@ -133,17 +158,22 @@ class AcceptContract
         return $acceptance->refresh();
     }
 
-    private function verifyChallenge(ContractSigningChallenge $challenge, string $code): bool
-    {
-        if ($challenge->verified_at !== null && $challenge->consumed_at === null) {
-            return false;
-        }
-
-        $result = DB::transaction(function () use ($challenge, $code): array {
+    private function verifyChallenge(
+        ContractSigningChallenge $challenge,
+        string $code,
+        string $sessionIdentifierHash,
+    ): void {
+        $result = DB::transaction(function () use ($challenge, $code, $sessionIdentifierHash): array {
             $locked = ContractSigningChallenge::query()->lockForUpdate()->findOrFail($challenge->id);
 
             if ($locked->consumed_at !== null || $locked->expires_at->isPast() || $locked->attempts >= 5) {
                 return ['valid' => false, 'attempts' => $locked->attempts, 'reason' => 'expired'];
+            }
+
+            if (! hash_equals($locked->session_identifier_hash, $sessionIdentifierHash)) {
+                $locked->update(['consumed_at' => now()]);
+
+                return ['valid' => false, 'attempts' => $locked->attempts, 'reason' => 'session_mismatch'];
             }
 
             if (! Hash::check($code, $locked->code_hash)) {
@@ -157,9 +187,11 @@ class AcceptContract
                 return ['valid' => false, 'attempts' => $locked->attempts, 'reason' => 'invalid_code'];
             }
 
-            $locked->update(['verified_at' => now()]);
-
-            return ['valid' => true, 'attempts' => $locked->attempts, 'reason' => null];
+            return [
+                'valid' => true,
+                'attempts' => $locked->attempts,
+                'reason' => null,
+            ];
         });
 
         if (! $result['valid']) {
@@ -172,17 +204,16 @@ class AcceptContract
             throw new ContractSigningException('Doğrulama kodu geçersiz, süresi dolmuş veya deneme sınırı aşılmış.');
         }
 
-        $challenge->refresh();
-
-        return true;
     }
 
     private function createInvoiceIfNeeded(ServiceOrder $order, ContractAcceptance $acceptance): void
     {
         $existingInvoice = $order->invoice()->first();
 
-        if ($existingInvoice?->status === InvoiceStatus::Unpaid) {
-            $order->update(['status' => ServiceOrderStatus::Invoiced, 'last_error' => null]);
+        if ($existingInvoice !== null) {
+            if ($existingInvoice->status === InvoiceStatus::Unpaid) {
+                $order->update(['status' => ServiceOrderStatus::Invoiced, 'last_error' => null]);
+            }
 
             return;
         }

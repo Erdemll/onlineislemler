@@ -4,11 +4,13 @@ use App\Models\ContractSigningChallenge;
 use App\Models\ContractVersion;
 use App\Models\Customer;
 use App\Models\ServiceOrder;
+use App\Services\Contracts\EncryptedContractDocumentStorage;
 use App\Services\Contracts\GenerateSignedContractPdf;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 use Illuminate\Support\Facades\Crypt;
 use Illuminate\Support\Facades\Storage;
 use setasign\Fpdi\Fpdi;
+use setasign\Fpdi\PdfParser\StreamReader;
 
 uses(RefreshDatabase::class);
 
@@ -48,10 +50,10 @@ it('appends one evidence page without changing the source PDF', function () {
     );
 
     Storage::disk('local')->assertExists($result['document_path']);
-    $finalBytes = Storage::disk('local')->get($result['document_path']);
+    $finalBytes = app(EncryptedContractDocumentStorage::class)->get($result['document_path']);
     expect(hash('sha256', $finalBytes))->toBe($result['signed_document_hash']);
     $reader = new Fpdi;
-    expect($reader->setSourceFile(Storage::disk('local')->path($result['document_path'])))->toBe(5);
-    expect(hash('sha256', Storage::disk('local')->get($version->source_document_path)))
+    expect($reader->setSourceFile(StreamReader::createByString($finalBytes)))->toBe(5);
+    expect(hash('sha256', app(EncryptedContractDocumentStorage::class)->get($version->source_document_path)))
         ->toBe($version->source_document_hash);
 });

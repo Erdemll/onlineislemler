@@ -5,6 +5,7 @@ namespace App\Services\CariPlus;
 use App\Contracts\CariPlusGateway;
 use App\Exceptions\CariPlusException;
 use App\Models\Customer;
+use Illuminate\Database\QueryException;
 
 class ResolveCurrentAccount
 {
@@ -28,9 +29,20 @@ class ResolveCurrentAccount
             throw new CariPlusException("Cari Plus’ta {$code} kodlu cari hesap bulunamadı.");
         }
 
-        $customer->forceFill([
-            'cari_plus_current_account_id' => $currentAccountId,
-        ])->save();
+        if (Customer::query()
+            ->where('cari_plus_current_account_id', $currentAccountId)
+            ->whereKeyNot($customer->id)
+            ->exists()) {
+            throw new CariPlusException('Cari Plus cari hesabı başka bir müşteriye bağlı.');
+        }
+
+        try {
+            $customer->forceFill([
+                'cari_plus_current_account_id' => $currentAccountId,
+            ])->save();
+        } catch (QueryException $exception) {
+            throw new CariPlusException('Cari Plus cari hesabı başka bir müşteriye bağlı.', previous: $exception);
+        }
 
         return $currentAccountId;
     }

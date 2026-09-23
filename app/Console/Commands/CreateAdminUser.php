@@ -12,8 +12,7 @@ use Illuminate\Validation\Rules\Password;
 
 #[Signature('admin:create
     {email : Yönetici e-posta adresi}
-    {--name=Tepenet Yönetici : Yönetici adı}
-    {--password= : Boş bırakılırsa güvenli bir parola üretilir}')]
+    {--name=Tepenet Yönetici : Yönetici adı}')]
 #[Description('Giriş yapabilecek bir yönetici hesabı oluşturur veya günceller')]
 class CreateAdminUser extends Command
 {
@@ -21,8 +20,9 @@ class CreateAdminUser extends Command
     {
         $email = mb_strtolower(trim((string) $this->argument('email')));
         $name = trim((string) $this->option('name'));
-        $passwordOption = trim((string) $this->option('password'));
-        $password = $passwordOption !== '' ? $passwordOption : Str::password(24);
+        $passwordInput = trim((string) $this->secret('Parola (güvenli parola üretmek için boş bırakın)'));
+        $generatedPassword = $passwordInput === '';
+        $password = $generatedPassword ? Str::password(24) : $passwordInput;
 
         $validator = Validator::make([
             'email' => $email,
@@ -52,10 +52,11 @@ class CreateAdminUser extends Command
         ])->save();
 
         $this->components->info('Yönetici hesabı hazır.');
-        $this->table(['Alan', 'Değer'], [
-            ['E-posta', $user->email],
-            ['Parola', $password],
-        ]);
+        $this->line("E-posta: {$user->email}");
+
+        if ($generatedPassword) {
+            $this->line("Üretilen parola: {$password}");
+        }
 
         return self::SUCCESS;
     }

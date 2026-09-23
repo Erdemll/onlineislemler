@@ -10,8 +10,10 @@ test('the command creates an administrator with a hashed password', function () 
     $this->artisan('admin:create', [
         'email' => 'ADMIN@EXAMPLE.COM',
         '--name' => 'Panel Yöneticisi',
-        '--password' => 'StrongPassword123!',
-    ])->assertSuccessful();
+    ])
+        ->expectsQuestion('Parola (güvenli parola üretmek için boş bırakın)', 'StrongPassword123!')
+        ->doesntExpectOutputToContain('StrongPassword123!')
+        ->assertSuccessful();
 
     $admin = User::query()->where('email', 'admin@example.com')->firstOrFail();
 
@@ -26,8 +28,9 @@ test('the command upgrades an existing account without creating a duplicate', fu
 
     $this->artisan('admin:create', [
         'email' => 'admin@example.com',
-        '--password' => 'AnotherPassword123!',
-    ])->assertSuccessful();
+    ])
+        ->expectsQuestion('Parola (güvenli parola üretmek için boş bırakın)', 'AnotherPassword123!')
+        ->assertSuccessful();
 
     expect(User::query()->where('email', 'admin@example.com')->count())->toBe(1)
         ->and(User::query()->where('email', 'admin@example.com')->value('is_admin'))->toBeTrue();

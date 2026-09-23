@@ -19,6 +19,8 @@ class Service extends Model
         'price',
         'currency',
         'tax_rate',
+        'category_id',
+        'category_name',
         'price_includes_tax',
         'cari_plus_service_id',
         'cari_plus_product_id',
@@ -33,6 +35,7 @@ class Service extends Model
         return [
             'price' => 'decimal:2',
             'tax_rate' => 'decimal:2',
+            'category_id' => 'integer',
             'price_includes_tax' => 'boolean',
             'cari_plus_updated_at' => 'datetime',
             'synced_at' => 'datetime',
@@ -49,6 +52,11 @@ class Service extends Model
         }
 
         return round($price * (1 + ((float) $this->tax_rate / 100)), 2);
+    }
+
+    public function grossPriceInKurus(): int
+    {
+        return (int) round($this->grossPrice() * 100);
     }
 
     public function invoices(): HasMany
